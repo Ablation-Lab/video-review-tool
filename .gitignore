@@ -1,5 +1,6 @@
-# Review packs and test media
+# Review packs and test media (but not the skill folder, which shares the name pattern)
 *-review/
+!/skills/video-review/
 out/
 *.mp4
 *.mov

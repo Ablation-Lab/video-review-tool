@@ -30,7 +30,10 @@ can read without watching the video:
 - **Microsoft Edge or Google Chrome** for the PDF (Edge comes with Windows). Use `-NoPdf` to skip it.
 - **Remotion projects only**: Node.js, and `npm install` already run in the project.
 
-`AudioScan.cs` must stay next to `review-video.ps1`; the script compiles it on each run.
+The tool lives in `skills/video-review/`: `review-video.ps1`, `AudioScan.cs` (compiled by the
+script on each run, so keep it next to it) and `SKILL.md`. That way the folder can be installed on
+its own as a Claude Code skill (see [Using it with your AI](#using-it-with-your-ai)). The
+`review-video.ps1` at the root of the repo is a shortcut to it.
 
 ## Running it
 
@@ -48,7 +51,7 @@ From PowerShell, in this folder:
 ```
 
 If Windows blocks the script ("running scripts is disabled on this system"), run it this way
-instead, or run `Unblock-File .\review-video.ps1` once:
+instead, or run `Get-ChildItem -Recurse *.ps1 | Unblock-File` once in this folder:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\review-video.ps1 C:\path\to\video.mp4
@@ -78,12 +81,62 @@ explainer-review\
 Frame names are `<number>_<hh-mm-ss.mmm>_<reason>.png`. Running the script again replaces the
 frames from the previous run.
 
-### Using the results with Claude
+## Using it with your AI
 
-- **Claude Code**: ask it to *"open report.md and the frames in `<folder>` and check each slide
-  against its narration line"*. The report links every frame, so Claude can open the ones it needs.
-- **Claude chat**: attach the PDF. The cover page has the audio findings; each frame on the
-  contact sheet shows its timestamp and the narration line at that moment.
+### Install it as a Claude Code skill
+
+The `skills/video-review` folder is a complete Claude Code skill: the instructions Claude follows
+(`SKILL.md`) and the tool itself. Copy it into your personal skills folder and every Claude Code
+session on your computer can use it. From PowerShell, in this repo:
+
+```powershell
+New-Item -ItemType Directory -Force "$HOME\.claude\skills" | Out-Null
+Copy-Item -Recurse -Force .\skills\video-review "$HOME\.claude\skills\"
+```
+
+That gives you `<your home folder>\.claude\skills\video-review\SKILL.md`. Claude Code picks the
+skill up without a restart (if the `skills` folder didn't exist when the session started, type
+`/reload-skills`). Run the same two lines again after you update this repo.
+
+Then ask in plain words, for example:
+
+> Review C:\path\to\video.mp4
+
+> Check the slides in C:\path\to\remotion-project against the narration.
+
+or type `/video-review C:\path\to\video.mp4`. Claude runs the tool, opens `report.md` and the
+frames, checks each slide against its narration line and reports problems with frame numbers and
+timestamps.
+
+To use the skill in one project only, copy the folder into that project's `.claude\skills\`
+folder instead.
+
+### Without skills
+
+Paste a prompt like this into a fresh session of Claude Code (or another AI assistant that can run
+commands on your computer):
+
+> Read the README at C:\path\to\video-review-tool\README.md. Then run the tool on
+> C:\path\to\video.mp4, open report.md and the frames it makes, and check every slide against its
+> narration line. List anything that doesn't match, with the frame number and timestamp, then any
+> audio problems from the report.
+
+For a Remotion project, name the folder and composition instead: *"run the tool on the Remotion
+project in C:\path\to\remotion-project, composition Main"*.
+
+### Getting a PDF to attach to a chat
+
+Ask:
+
+> Run the video review tool on C:\path\to\video.mp4 and give me the path to the PDF, so I can
+> attach it to a Claude chat.
+
+(Or run the tool yourself: the PDF is `<video name>-review\<video name>-review.pdf`.) Then attach
+the PDF to a chat and ask, for example:
+
+> This PDF is a review sheet for my video. The first page has the audio findings; then each frame
+> is shown with its timestamp and the narration line at that moment. Check every frame against its
+> narration line and list anything that doesn't match, with the frame number and timestamp.
 
 ## Options
 
@@ -106,7 +159,7 @@ frames from the previous run.
 | `-NoPdf` | off | Skip the PDF. |
 | `-KeepWork` | off | Keep the temporary work folder, for debugging. |
 
-`Get-Help .\review-video.ps1 -Full` shows the same descriptions.
+`Get-Help .\skills\video-review\review-video.ps1 -Full` shows the same descriptions.
 
 ## Narration
 
