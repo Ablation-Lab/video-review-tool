@@ -1,0 +1,15 @@
+# Review packs and test media
+*-review/
+out/
+*.mp4
+*.mov
+*.webm
+*.mkv
+*.wav
+*.mp3
+
+# Editor and OS files
+.vscode/
+.idea/
+Thumbs.db
+.DS_Store
