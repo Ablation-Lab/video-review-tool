@@ -104,16 +104,17 @@ Skim C:\path\to\video.mp4 with Sonnet and write a timeline file, then give me yo
 Make the review PDF for C:\path\to\video.mp4 so I can attach it to a chat
 ```
 
-**Sharing with a chat AI**: for a long video, send a text timeline file plus a small key-frames
-PDF (about 15 to 20 frames: one fully built slide per scene and any problem frames), not the full
-contact sheet. Ask:
+**Sharing with a chat AI**: for a long video, attach a text timeline file plus a small key-frames
+PDF (about 15 to 20 frames), not the full contact sheet. `-KeyFramesPdf` makes `key-frames.pdf`:
+one fully built frame per scene (the end-of-scene frame, once everything has appeared) plus any
+frames flagged as findings, each page labelled with its timestamp, scene name and the finding. Ask:
 
 ```text
-Make a timeline file and a key-frames PDF of about 16 to 20 frames for C:\path\to\video.mp4, so I can attach both to a chat
+Make a timeline file and a key-frames PDF for C:\path\to\video.mp4, so I can attach both to a chat
 ```
 
-The full contact-sheet PDF is best for short videos such as Shorts, or for just the changed frames
-(`-ChangesPdf`).
+The key-frames PDF is the one to attach for long videos. The full contact-sheet PDF is best for
+short videos such as Shorts, or for just the changed frames (`-ChangesPdf`).
 
 ## Requirements
 
@@ -195,6 +196,7 @@ explainer-review\
   report.md                 changes, audio, narration, on-screen text checks and the frame list
   explainer-review.pdf      cover page and contact sheet, for a Claude chat
   explainer-changes.pdf     only with -ChangesPdf: the frames that changed since the last review
+  key-frames.pdf            only with -KeyFramesPdf: about 15 to 20 key frames, for a chat
   review.json               frame data the next run compares with
   frames\
     0001_00-00-00.000_interval.png
@@ -254,7 +256,18 @@ project in C:\path\to\remotion-project, composition Main"*.
 
 ### Getting a PDF to attach to a chat
 
-Ask:
+For a long video, attach the small key-frames PDF (about 15 to 20 frames, one per scene plus the
+flagged ones, under 10 MB) and a text timeline:
+
+> Run the video review tool on C:\path\to\video.mp4 with -KeyFramesPdf and give me the path to key-frames.pdf.
+
+If the review folder already holds a complete review, `-KeyFramesPdf` builds the PDF from those
+frames and changes nothing else; otherwise it runs the review first. Scenes are found from the
+numbered footer badge on slide videos (`03 / SIZE DEPENDS ON THE TASK`); with no clear scenes, it
+picks frames spread evenly over the video. Findings are the frames the review flagged (spelling,
+reading time, spoken numbers not on screen, safe areas, frames with no text).
+
+For a short video, the full contact sheet is fine. Ask:
 
 > Run the video review tool on C:\path\to\video.mp4 and give me the path to the PDF, so I can
 > attach it to a Claude chat.
@@ -298,6 +311,8 @@ the PDF to a chat and ask, for example:
 | `-SafeMargins t,r,b,l` | `288,192,672,48` | Shorts safe-area margins in pixels at 1080x1920 (top, right, bottom, left). |
 | `-CompareWith <folder>` | the last run | A previous review folder to compare with, e.g. the review of an older file name. |
 | `-ChangesPdf` | off | Also make a PDF of only the frames that changed since the previous review. |
+| `-KeyFramesPdf` | off | Also make `key-frames.pdf`: about 15 to 20 frames (one fully built frame per scene plus flagged frames), each labelled with timestamp, scene and finding. Built from the existing frames if the output folder already holds a review. |
+| `-KeyFramesMaxMB <MB>` | `10` | Size limit for `key-frames.pdf`. Frames are made smaller until it fits. |
 | `-KeepWork` | off | Keep the temporary work folder, for debugging. |
 
 `Get-Help .\skills\video-review\review-video.ps1 -Full` shows the same descriptions.

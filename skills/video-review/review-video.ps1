@@ -113,6 +113,15 @@ param(
     # Also make a PDF of only the frames that changed since the previous review.
     [switch]$ChangesPdf,
 
+    # Also make key-frames.pdf: a small PDF of about 15 to 20 frames (one fully built frame per scene
+    # plus the frames flagged as findings), to attach to a chat in place of the full contact sheet.
+    # If the output folder already holds a complete review, it is built from those frames and nothing
+    # else is changed or re-extracted.
+    [switch]$KeyFramesPdf,
+
+    # Size limit for key-frames.pdf in MB. Frames are made smaller until it fits.
+    [double]$KeyFramesMaxMB = 10,
+
     # Keep the temporary _work folder (for debugging).
     [switch]$KeepWork
 )
@@ -1075,6 +1084,7 @@ function Build-Report($ctx, $audio, $narr, $frames, $pdfInfo, $checks, $chg, $ch
     [void]$sb.Append("## Summary$nl$nl| | |$nl|---|---|$nl")
     foreach ($row in $ctx.Summary) { [void]$sb.Append("| $($row[0]) | $(Get-Md $row[1]) |$nl") }
     if ($pdfInfo) { [void]$sb.Append(('| PDF | {0} ({1:0.0} MB, frames at {2} px) |{3}' -f [IO.Path]::GetFileName($pdfInfo.Path), $pdfInfo.SizeMB, $pdfInfo.LongSide, $nl)) }
+    if ($script:KeyFramesInfo) { [void]$sb.Append(('| Key-frames PDF | {0} ({1} frames, {2:0.0} MB) |{3}' -f [IO.Path]::GetFileName($script:KeyFramesInfo.Path), $script:KeyFramesInfo.Count, $script:KeyFramesInfo.SizeMB, $nl)) }
     if ($changesPdf) { [void]$sb.Append(('| Changes PDF | {0} ({1:0.0} MB, changed frames only) |{2}' -f [IO.Path]::GetFileName($changesPdf.Path), $changesPdf.SizeMB, $nl)) }
     [void]$sb.Append($nl)
 
@@ -1159,6 +1169,7 @@ function Build-Report($ctx, $audio, $narr, $frames, $pdfInfo, $checks, $chg, $ch
 # ---------------------------------------------------------------------------------------------
 
 . (Join-Path $PSScriptRoot 'review-checks.ps1')
+. (Join-Path $PSScriptRoot 'key-frames.ps1')
 
 $exitCode = 0
 $work = $null
@@ -1192,6 +1203,20 @@ try {
 
     New-Item -ItemType Directory -Force -Path $OutDir | Out-Null
     $OutDir = (Resolve-Path -LiteralPath $OutDir).Path
+    if ($KeyFramesPdf) {
+        # Reuse a complete review in the output folder: only key-frames.pdf is written.
+        $pack = Read-ExistingPack $OutDir
+        if ($pack) {
+            Write-Step "Key frames: using the $(@($pack.Frames).Count) frames of the review in $OutDir"
+            $kf = New-KeyFramesPdf $pack.Ctx $pack.Frames $OutDir $work
+            Write-Host ''
+            Write-Host 'Done.' -ForegroundColor Green
+            Write-Host ('  Key frames: {0} ({1} frames, {2:0.0} MB)' -f $kf.Path, $kf.Count, $kf.SizeMB)
+            if ($script:Warnings.Count) { Write-Host "  $($script:Warnings.Count) warning(s) above." -ForegroundColor Yellow }
+            exit 0
+        }
+        Write-Host 'No complete review found in the output folder, so the review will run first.'
+    }
     # Keep the last run for the "changes since the last review" comparison.
     $prevDir = $null
     if ($CompareWith) {
@@ -1323,6 +1348,13 @@ try {
         }
     }
 
+    if ($KeyFramesPdf) {
+        $kfFrames = @($frameList | ForEach-Object {
+                [pscustomobject]@{ Index = $_.Index; Time = $_.Time; Name = $_.Name; Path = $_.Path; Why = $_.Why
+                    Lines = @($_.Lines | ForEach-Object { $_.Text }); Flags = @($_.Flags | Select-Object -Unique) } })
+        $script:KeyFramesInfo = New-KeyFramesPdf ([pscustomobject]$ctx) $kfFrames $OutDir $work
+    }
+
     Write-Step 'Writing report.md and review.json'
     $report = Join-Path $OutDir 'report.md'
     Write-Utf8 $report (Build-Report ([pscustomobject]$ctx) $audio $narr $frameList $pdfInfo $checks $chg $changesPdfInfo)
@@ -1333,6 +1365,7 @@ try {
     Write-Host "  Report: $report"
     Write-Host "  Frames: $framesDir ($($frameList.Count))"
     if ($pdfInfo) { Write-Host ('  PDF:    {0} ({1:0.0} MB)' -f $pdfInfo.Path, $pdfInfo.SizeMB) }
+    if ($script:KeyFramesInfo) { Write-Host ('  Key frames: {0} ({1} frames, {2:0.0} MB)' -f $script:KeyFramesInfo.Path, $script:KeyFramesInfo.Count, $script:KeyFramesInfo.SizeMB) }
     if ($changesPdfInfo) { Write-Host ('  Changes PDF: {0} ({1:0.0} MB)' -f $changesPdfInfo.Path, $changesPdfInfo.SizeMB) }
     if ($audio) {
         Write-Host ('  Audio:  {0}, true peak {1}, {2} silence(s) over {3} s, {4} possible click(s), {5} clipped sample(s)' -f `

@@ -38,6 +38,8 @@ Useful options (all optional):
 | `-OutDir <folder>` | Where to write the pack. |
 | `-CompareWith <folder>` | Compare with an older review folder (e.g. of a previous file name). By default each run compares with the last run of the same video. |
 | `-ChangesPdf` | Also make a PDF of only the changed frames, when the user wants just the changes. |
+| `-KeyFramesPdf` | Make `key-frames.pdf` in the review folder: about 15 to 20 frames, one fully built frame per scene plus flagged frames, labelled with timestamp, scene and finding, under 10 MB. If the review folder already holds a complete review it is built from those frames and nothing else changes; otherwise the review runs first. Add `-NoPdf` to skip the full contact sheet. |
+| `-KeyFramesMaxMB <n>` | Size limit for `key-frames.pdf` (default 10). |
 | `-WordsPerSecond <n>` | Reading speed for the reading-time check (default 3). |
 | `-NumberWordsFrom <n>` | Spoken number words are checked from this value up (default 10). |
 | `-SafeMargins t,r,b,l` | Shorts safe-area margins at 1080x1920 (default 288,192,672,48, Google's cautious figures). |
@@ -100,17 +102,19 @@ Rough frame counts: `-Interval 2` (the default) gives 30 regular frames per minu
 | "...use Sonnet subagents" / "...use Opus" | That model for the subagents (Sonnet is the default anyway). |
 | "Skim it with Sonnet and write a timeline file, then give me your overall opinion from the timeline" | Run the tool, then have one Sonnet subagent skim the pack, open the sample of key frames (one fully built slide per scene) and write `timeline.md` in the review folder: one entry per scene with its time range, the narration in brief, the on-screen text in brief, what the visuals look like and any problems. Read only that file (open no frames yourself) and give an overall opinion: structure, pacing, clarity, visual style, and whether the slides support the narration. Say how many frames were opened. |
 | "Make the review PDF for C:\path\to\video.mp4 so I can attach it to a chat" | Run the tool and give the full path of the PDF. Don't review or open frames unless asked. |
-| "Make a timeline file and a key-frames PDF ... so I can attach both to a chat" | See "Sharing with a chat AI" below. |
+| "Make a timeline file and a key-frames PDF ... so I can attach both to a chat" | Run the tool with `-KeyFramesPdf` (see "Sharing with a chat AI" below) and write the timeline as above. |
 
 ### Sharing with a chat AI
 
 For a long video, don't attach the full contact-sheet PDF (hundreds of frames). Give the user two
-things: a text timeline file (`timeline.md`, as above) and a small **key-frames PDF** of about 15
-to 20 frames. Pick them from the existing pack, without rerunning the tool: one fully built slide
-per scene (the `end of scene` frame) plus any frames named in findings. Label each with its
-timestamp and scene name, keep the PDF under 10 MB, save it in the review folder, and give its full
-path. The tool has no option for this: build it from the PNGs in `frames/` (for example with
-ffmpeg and a short script) and don't change the user's project. The full PDF is best for short
+things: a text timeline file (`timeline.md`, as above) and the **key-frames PDF**, made with
+`-KeyFramesPdf` (add `-NoPdf` if the full PDF isn't wanted; on a folder that already has a review
+it reuses the frames and runs in seconds). It holds about 15 to 20 frames: one fully built frame
+per scene plus the frames the review flagged, each labelled with timestamp, scene name and the
+finding, under 10 MB, saved as `key-frames.pdf` in the review folder. Give its full path. If the
+tool couldn't find clear scenes (no numbered footer badge), it spreads the frames evenly and says
+so in the labels. It can't spot visual problems itself, so if you found some (an overlap, a blank
+frame), say which timestamps to look at when handing it over. The full PDF is best for short
 videos such as Shorts, or `-ChangesPdf` for just the changed frames.
 
 ## 3. Review the video
@@ -156,4 +160,5 @@ changes, then 6 to 9 frames a page, each labelled with its timestamp, any proble
 narration line and the OCR text (blue, misspellings underlined). It is kept under 20 MB. With
 `-ChangesPdf` there is also `<name>-changes.pdf` with only the changed frames. When the user wants
 something to attach to a Claude chat or send to someone, give them the full path. Use
-`-MaxPdfMB <n>` for a smaller limit.
+`-MaxPdfMB <n>` for a smaller limit. `key-frames.pdf` (with `-KeyFramesPdf`) is the one to attach for
+long videos.

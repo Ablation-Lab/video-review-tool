@@ -519,7 +519,7 @@ function Write-ReviewJson([string]$file, $ctx, $frames, [int]$sw, [int]$sh) {
     $list = @()
     foreach ($f in $frames) {
         $list += [ordered]@{ index = $f.Index; time = [Math]::Round($f.Time, 3); frame = $f.Frame; name = $f.Name; why = $f.Why
-            lines = @($f.Lines | ForEach-Object { $_.Text }); sig = $(if ($f.Sig) { [Convert]::ToBase64String($f.Sig) } else { $null }) }
+            lines = @($f.Lines | ForEach-Object { $_.Text }); flags = @($f.Flags | Select-Object -Unique); sig = $(if ($f.Sig) { [Convert]::ToBase64String($f.Sig) } else { $null }) }
     }
     $doc = [ordered]@{ tool = 'video-review'; version = 2; made = (Get-Date -Format 'yyyy-MM-dd HH:mm'); source = $ctx.Title
         mode = $ctx.Mode; width = $ctx.Width; height = $ctx.Height; duration = [Math]::Round($ctx.Duration, 3); sigW = $sw; sigH = $sh; frames = $list }
