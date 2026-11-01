@@ -54,6 +54,16 @@ Code skill (see [Using it with your AI](#using-it-with-your-ai)). Keep its files
 
 The `review-video.ps1` at the root of the repo is a shortcut to the tool.
 
+## Getting it
+
+```powershell
+git clone https://github.com/Ablation-Lab/video-review-tool.git
+cd video-review-tool
+```
+
+Then run it from that folder (below), or install it as a Claude Code skill (see
+[Using it with your AI](#using-it-with-your-ai)).
+
 ## Running it
 
 From PowerShell, in this folder:
@@ -321,3 +331,9 @@ commit if anything matches (exit 1) or if the check itself can't run properly (e
   is missing, empty or tracked.
 - A known-safe line can be allowed by adding its hash to `.privacy-allow`:
   `bash scripts/privacy-check.sh --hash <path> <line number>`.
+
+## Credits and licence
+
+Built with [Claude Code](https://claude.com/claude-code).
+
+Released under the MIT licence; see [LICENSE](LICENSE).
