@@ -72,16 +72,28 @@ frame, once used up a whole usage session. So:
   where there should be a slide. Say at the end that it was a skim and how many frames you opened.
 - **Full review only when asked.** If the video is over 5 minutes (see `Length` and `Frames` in
   the summary of `report.md`), stop before opening any frames: tell the user how many frames there
-  are, that a full review will use a lot of their usage, and ask whether to go ahead, offer a skim
-  instead, or rerun with a larger `-Interval` for fewer frames (`-Interval 4` halves the regular
-  frames). Wait for the answer.
-- **When doing a full review**: use a cheaper model (Sonnet or Haiku, never Opus) for any
-  subagents, run at most two at a time, and cap the frames opened in total at the number the user
-  agreed to (about 150 if they gave none). Give each subagent its own range of frames and the
-  matching rows of `report.md`, and have it return only the problems it found.
+  are and how many you would open, that a full review will use a lot of their usage, and ask
+  whether to go ahead, offer a skim instead, or rerun with a larger `-Interval` for fewer frames
+  (`-Interval 4` halves the regular frames). Wait for the answer.
+- **When doing a full review**: run at most two subagents at a time and open at most 100 frames in
+  total, unless the user gave another number or said "every frame, no cap". Use Sonnet for the
+  subagents unless the user asks for Opus; if they do, use it, but mention once that it uses much
+  more usage. Give each subagent its own range of frames and the matching rows of `report.md`, and
+  have it return only the problems it found.
 
 Rough frame counts: `-Interval 2` (the default) gives 30 regular frames per minute of video,
 `-Interval 4` gives 15 and `-Interval 10` gives 6, plus up to two per scene change.
+
+### How users ask
+
+| The user says | Do |
+| --- | --- |
+| "Review C:\path\to\video.mp4" | Skim. |
+| "Do a full review of C:\path\to\video.mp4" | Full review, up to 100 frames (ask first if over 5 minutes). |
+| "...full review..., every frame, no cap" | Full review of every frame. Ask first if over 5 minutes, saying it can use a whole usage session. |
+| "...use Sonnet subagents" / "...use Opus" | That model for the subagents (Sonnet is the default anyway). |
+| "Skim it with Sonnet and write a timeline file, then give me your overall opinion from the timeline" | Run the tool, then have one Sonnet subagent skim the pack and write `timeline.md` in the review folder: one entry per scene with its time range, the narration in brief, the on-screen text in brief and any problems. Read only that file (open no frames yourself) and give an overall opinion: structure, pacing, clarity, and whether the slides support the narration. |
+| "Make the review PDF for C:\path\to\video.mp4 so I can attach it to a chat" | Run the tool and give the full path of the PDF. Don't review or open frames unless asked. |
 
 ## 3. Review the video
 

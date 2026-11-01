@@ -31,9 +31,10 @@ subagents opening every frame, used up a whole usage session.
   OCR'd on-screen text and the scene-change frames (`end of scene` and `scene change`), and opens
   a frame image only where something looks wrong: a flagged check, a narration line that doesn't
   fit the text on screen, a changed frame, an audio problem at that moment.
-- **Full review**: only when you ask for one. Use a cheaper model for any subagents (Sonnet or
-  Haiku, not Opus), run at most two at a time, and cap how many frames get opened in total. For a
-  long video, a larger `-Interval` cuts the frame count before the review starts.
+- **Full review**: only when you ask for one. Use a cheaper model for any subagents (Sonnet, unless
+  you ask for Opus), run at most two at a time, and cap how many frames get opened in total (100
+  unless you say otherwise). For a long video, a larger `-Interval` cuts the frame count before the
+  review starts.
 
 Rough guide to how many frames the tool makes:
 
@@ -48,6 +49,56 @@ Rough guide to how many frames the tool makes:
 Add up to two frames per scene change (the end of one slide and the start of the next), so a
 slide video with a new slide every 10 seconds adds up to about 12 a minute. The summary at the top
 of `report.md` gives the exact count.
+
+## How to ask
+
+With the [skill installed](#install-it-as-a-claude-code-skill), copy one of these into Claude Code
+and change the path.
+
+**Skim** (the default): report, on-screen text and scene changes; frames opened only where
+something looks wrong.
+
+```text
+Review C:\path\to\video.mp4
+```
+
+**Full review, capped**: opens up to 100 frames by default. On a video over 5 minutes, Claude
+asks before it starts.
+
+```text
+Do a full review of C:\path\to\video.mp4
+```
+
+**Every frame**: no cap. On a long video this can use a whole usage session.
+
+```text
+Do a full review of C:\path\to\video.mp4, every frame, no cap
+```
+
+**Choosing the model** for the subagents: add one of these to a full review. Sonnet is
+recommended; Opus uses much more usage.
+
+```text
+Do a full review of C:\path\to\video.mp4, use Sonnet subagents
+```
+
+```text
+Do a full review of C:\path\to\video.mp4, use Opus
+```
+
+**Big-picture verdict, cheaply**: a Sonnet subagent skims the video and writes `timeline.md`, a
+scene-by-scene timeline, and Claude gives its opinion of the whole video from that file without
+opening frames itself.
+
+```text
+Skim C:\path\to\video.mp4 with Sonnet and write a timeline file, then give me your overall opinion from the timeline
+```
+
+**Just the PDF**: runs the tool and gives you the PDF's path, with no review.
+
+```text
+Make the review PDF for C:\path\to\video.mp4 so I can attach it to a chat
+```
 
 ## Requirements
 
