@@ -21,6 +21,34 @@ can read without watching the video:
   contact sheet of 6 to 9 labelled frames per page, with any problems, the narration line and the
   on-screen text under each frame. Kept under 20 MB.
 
+## Cost: skim versus full review
+
+Running the tool costs nothing in AI usage. Having an AI open the frames is what costs: every
+frame opened is an image it has to read. A full review of a 15-minute video, with six Opus
+subagents opening every frame, used up a whole usage session.
+
+- **Skim** (the default, and the one to use for long videos): the AI works from `report.md`, the
+  OCR'd on-screen text and the scene-change frames (`end of scene` and `scene change`), and opens
+  a frame image only where something looks wrong: a flagged check, a narration line that doesn't
+  fit the text on screen, a changed frame, an audio problem at that moment.
+- **Full review**: only when you ask for one. Use a cheaper model for any subagents (Sonnet or
+  Haiku, not Opus), run at most two at a time, and cap how many frames get opened in total. For a
+  long video, a larger `-Interval` cuts the frame count before the review starts.
+
+Rough guide to how many frames the tool makes:
+
+| `-Interval` | Regular frames per minute | 5-minute video | 15-minute video |
+| --- | --- | --- | --- |
+| `1` | 60 | 300 | 900 |
+| `2` (default) | 30 | 150 | 450 |
+| `4` | 15 | 75 | 225 |
+| `5` | 12 | 60 | 180 |
+| `10` | 6 | 30 | 90 |
+
+Add up to two frames per scene change (the end of one slide and the start of the next), so a
+slide video with a new slide every 10 seconds adds up to about 12 a minute. The summary at the top
+of `report.md` gives the exact count.
+
 ## Requirements
 
 - Windows PowerShell 5.1 (built into Windows 10 and 11) or PowerShell 7.
