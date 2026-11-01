@@ -11,6 +11,9 @@
       seconds and sudden clicks or pops, all with timestamps;
     - the narration line spoken at each frame, when a narration script, recording table,
       voiceover.json or subtitle file can be found and matched to the audio;
+    - the text on screen in every frame (Windows' built-in OCR), with checks for spelling,
+      reading time, spoken numbers missing from the screen and YouTube Shorts safe areas;
+    - what changed since the previous review of the same video (kept in <OutDir>\previous);
     - report.md (for Claude Code: open it with the frames) and a PDF (to attach to a chat).
   Remotion project folder: renders stills at chosen frames with npx remotion still (no full render
   needed) and, unless -NoAudio, renders the audio track alone for the same checks.
@@ -80,6 +83,35 @@ param(
 
     # Skip the PDF.
     [switch]$NoPdf,
+
+    # Skip reading on-screen text (OCR) and the checks that use it: spelling, reading time, numbers
+    # and safe areas.
+    [switch]$NoOcr,
+
+    # Language for OCR and spelling, e.g. en-US. Default: your Windows language.
+    [string]$OcrLanguage,
+
+    # Text file of extra words the spelling check accepts, one per line. review-words.txt in the
+    # project folder is read automatically too.
+    [string]$WordList,
+
+    # Reading speed for the reading-time check, in words per second.
+    [double]$WordsPerSecond = 3,
+
+    # Numbers spoken as words are checked from this value up (5 and "five" are often said without
+    # being shown). Numbers written as digits in the narration are always checked.
+    [double]$NumberWordsFrom = 10,
+
+    # YouTube Shorts safe-area margins in pixels at 1080x1920: top,right,bottom,left. The default is
+    # Google's Universal Video Ad Safe Zones for vertical video.
+    [string]$SafeMargins = '288,192,672,48',
+
+    # A previous review folder to compare with. Default: the last run of this review, which is kept
+    # in <OutDir>\previous.
+    [string]$CompareWith,
+
+    # Also make a PDF of only the frames that changed since the previous review.
+    [switch]$ChangesPdf,
 
     # Keep the temporary _work folder (for debugging).
     [switch]$KeepWork
@@ -648,7 +680,7 @@ function Get-SceneTimes([string]$file, [string]$work) {
     [void](Invoke-Tool $script:Ffmpeg @('-hide_banner', '-nostdin', '-nostats', '-i', $file, '-an', '-vf', $vf, '-f', 'null', '-') 'scene detection' -WorkDir $work)
     $path = Join-Path $work $scoreFile
     if (-not (Test-Path -LiteralPath $path)) { throw 'Scene detection produced no scores file.' }
-    # A change is a run of samples scoring at least -SceneThreshold; runs less than 1 s apart are
+    # A change is a run of samples scoring at least -SceneThreshold; runs less than 0.5 s apart are
     # treated as one change (a fade out and a fade in, say).
     $runs = New-Object System.Collections.Generic.List[object]
     $t = $null; $prev = $null; $open = $null
@@ -657,7 +689,7 @@ function Get-SceneTimes([string]$file, [string]$work) {
         if ($line -match 'lavfi\.scene_score=([\d.e+-]+)' -and $null -ne $t) {
             if ([double]$Matches[1] -lt $SceneThreshold) { $open = $null; continue }
             if ($open) { $open.End = $t }
-            elseif ($runs.Count -and $t - $runs[$runs.Count - 1].End -lt 1.0) { $open = $runs[$runs.Count - 1]; $open.End = $t }
+            elseif ($runs.Count -and $t - $runs[$runs.Count - 1].End -lt 0.5) { $open = $runs[$runs.Count - 1]; $open.End = $t }
             else { $open = [pscustomobject]@{ Before = $prev; End = $t }; $runs.Add($open) }
         }
     }
@@ -677,6 +709,7 @@ function Export-VideoFrames([string]$file, $media, [string]$framesDir, [string]$
     $grid = @()
     for ($t = 0.0; $t -lt $media.Duration - 0.001; $t += $Interval) { & $add $t 'interval'; $grid += $t }
     $scenes = @(Get-SceneTimes $file $work)
+    $script:SceneRuns = $scenes
     foreach ($s in $scenes) {
         # The finished slide just before the change, and the new scene once it has settled
         # (or the regular frame just after, when one falls within 0.75 s).
@@ -744,7 +777,8 @@ function Save-Frames($list, [string]$framesDir) {
         $why = @($f.Reasons | ForEach-Object {
                 switch ($_) { 'interval' { "every $Interval s" } 'scene' { 'scene change' } 'sceneend' { 'end of scene' } 'last' { 'last frame' } 'chosen' { 'chosen frame' } default { $_ } }
             }) -join ', '
-        $result += [pscustomobject]@{ Index = $i; Time = $f.Time; Frame = $f.Frame; Name = $name; Path = $dest; Why = $why; Narr = $null }
+        $result += [pscustomobject]@{ Index = $i; Time = $f.Time; Frame = $f.Frame; Name = $name; Path = $dest; Why = $why; Narr = $null
+            Lines = @(); Text = ''; Misspelt = @(); Flags = (New-Object System.Collections.Generic.List[string]); Sig = $null; Change = $null; TokA = @(); TokB = @() }
     }
     return $result
 }
@@ -826,12 +860,7 @@ function New-Thumbs($frames, [string]$dir, [int]$longSide, [int]$quality, [bool]
     if (Test-Path -LiteralPath $dir) { Remove-Item -LiteralPath $dir -Recurse -Force }
     New-Item -ItemType Directory -Force -Path $dir | Out-Null
     $listFile = Join-Path $dir 'list.txt'
-    $sb = New-Object System.Text.StringBuilder
-    foreach ($f in $frames) {
-        $p = $f.Path.Replace('\', '/').Replace("'", "'\''")
-        [void]$sb.Append("file '$p'`nduration 0.04`n")
-    }
-    Write-Utf8 $listFile $sb.ToString()
+    Write-ConcatList $frames $listFile
     $scale = if ($portrait) { "scale=-2:'min($longSide,ih)'" } else { "scale='min($longSide,iw)':-2" }
     [void](Invoke-Tool $script:Ffmpeg @('-hide_banner', '-nostdin', '-v', 'error', '-f', 'concat', '-safe', '0', '-i', $listFile,
             '-vf', $scale, '-fps_mode', 'passthrough', '-q:v', "$quality", (Join-Path $dir 't%05d.jpg')) 'thumbnail creation')
@@ -843,8 +872,8 @@ function New-Thumbs($frames, [string]$dir, [int]$longSide, [int]$quality, [bool]
 function Write-PdfHtml([string]$htmlPath, $ctx, $frames, [string[]]$thumbNames, [string]$thumbRel) {
     $w = [Math]::Max(1, $ctx.Width); $h = [Math]::Max(1, $ctx.Height)
     $ar = $w / $h
-    $hasNarr = @($frames | Where-Object { $_.Narr }).Count -gt 0
-    # Page layout: about 6 to 9 frames a page, leaving room for the narration text.
+    $hasNarr = @($frames | Where-Object { $_.Narr -or $_.Text }).Count -gt 0
+    # Page layout: about 6 to 9 frames a page, leaving room for the narration and on-screen text.
     if ($ar -ge 1.2) { $orient = 'landscape'; $pw = 281; $ph = 194; $cols = 3; $rows = if ($hasNarr) { 2 } else { 3 } }
     elseif ($ar -le 0.83) { $orient = 'portrait'; $pw = 194; $ph = 281; $cols = 4; $rows = 2 }
     else { $orient = 'portrait'; $pw = 194; $ph = 281; $cols = 3; $rows = if ($hasNarr) { 2 } else { 3 } }
@@ -872,28 +901,37 @@ th { background: #eee; } .muted { color: #666; } .warn { color: #a40000; font-we
 .ts { font-weight: 700; font-size: 9.5pt; margin-top: 0.8mm; } .why { font-weight: 400; color: #666; font-size: 7.5pt; }
 .nar { font-size: 7.6pt; line-height: 1.25; margin-top: 0.5mm; overflow: hidden; }
 .pause { color: #777; font-style: italic; }
+.ocr { font-size: 7pt; line-height: 1.2; color: #24476b; margin-top: 0.6mm; overflow: hidden; max-height: 22mm; }
+.flag { font-size: 7pt; line-height: 1.2; color: #a40000; font-weight: 600; margin-top: 0.4mm; }
+.bad { color: #c00000; font-weight: 700; text-decoration: underline; }
 "@
     $sb = New-Object System.Text.StringBuilder
     [void]$sb.Append("<!doctype html><html><head><meta charset='utf-8'><title>$(Get-Html $ctx.Title)</title><style>$css</style></head><body>")
     [void]$sb.Append("<div class='cover'>")
     [void]$sb.Append($ctx.CoverHtml)
     [void]$sb.Append("<h2>Contact sheet</h2><p>$(@($frames).Count) frames follow, $perPage to a page, in time order. Each is labelled with its timestamp and why it was taken")
-    if ($hasNarr) { [void]$sb.Append('; the line under it is the narration at that moment (grey italic: a pause, showing the line just spoken)') }
-    [void]$sb.Append('.</p></div>')
+    [void]$sb.Append('. Under it: any problems found (red), the narration at that moment (grey italic: a pause, showing the line just spoken) and the text on screen as read by OCR (blue; possible misspellings underlined).</p></div>')
 
     $fa = @($frames)
     $pages = [Math]::Ceiling($fa.Count / $perPage)
     for ($p = 0; $p -lt $pages; $p++) {
         $chunk = @($fa[($p * $perPage)..([Math]::Min(($p + 1) * $perPage, $fa.Count) - 1)])
-        [void]$sb.Append("<div class='page'><div class='head'><span>$(Get-Html $ctx.Title)</span><span>Frames $($chunk[0].Index) to $($chunk[-1].Index) of $($fa.Count) &middot; page $($p + 1) of $pages</span></div><div class='grid'>")
-        foreach ($f in $chunk) {
-            $thumb = "$thumbRel/" + $thumbNames[$f.Index - 1]
+        [void]$sb.Append("<div class='page'><div class='head'><span>$(Get-Html $ctx.Title)</span><span>Frames #$($chunk[0].Index) to #$($chunk[-1].Index) &middot; page $($p + 1) of $pages</span></div><div class='grid'>")
+        for ($q = 0; $q -lt $chunk.Count; $q++) {
+            $f = $chunk[$q]
+            $thumb = "$thumbRel/" + $thumbNames[$p * $perPage + $q]
             [void]$sb.Append("<div class='cell'><img src='$thumb'><div class='ts'>#$($f.Index) &nbsp;$(Format-Time $f.Time) <span class='why'>$(Get-Html $f.Why)</span></div>")
+            foreach ($fl in @($f.Flags | Where-Object { $_ -notmatch '^spelling' } | Select-Object -Unique)) { [void]$sb.Append("<div class='flag'>$(Get-Html $fl)</div>") }
             if ($f.Narr) {
                 $cls = if ($f.Narr.Pause) { 'nar pause' } else { 'nar' }
                 $txt = $f.Narr.Text
                 if ($f.Narr.Pause) { $txt = "(pause) $txt" }
                 [void]$sb.Append("<div class='$cls'>$(Get-Html $txt)</div>")
+            }
+            if ($f.Text) {
+                $h = Get-Html $f.Text
+                foreach ($bw in @($f.Misspelt)) { $h = [regex]::Replace($h, '\b' + [regex]::Escape((Get-Html $bw)) + '\b', "<span class='bad'>$(Get-Html $bw)</span>") }
+                [void]$sb.Append("<div class='ocr'>Screen: $h</div>")
             }
             [void]$sb.Append('</div>')
         }
@@ -903,20 +941,20 @@ th { background: #eee; } .muted { color: #666; } .warn { color: #a40000; font-we
     Write-Utf8 $htmlPath $sb.ToString()
 }
 
-function New-ReviewPdf($ctx, $frames, [string]$outDir, [string]$work) {
+function New-ReviewPdf($ctx, $frames, [string]$outDir, [string]$work, [string]$suffix = 'review') {
     $browser = Find-Browser
     if (-not $browser) { throw 'Microsoft Edge or Google Chrome is needed to make the PDF and neither was found. Install one, or run with -NoPdf.' }
-    $pdf = Join-Path $outDir ($ctx.BaseName + '-review.pdf')
+    $pdf = Join-Path $outDir ($ctx.BaseName + "-$suffix.pdf")
     $html = Join-Path $work 'contact-sheet.html'
     $portrait = $ctx.Height -gt $ctx.Width
     $limit = $MaxPdfMB * 1MB
     $steps = @(@(960, 3), @(800, 4), @(640, 5), @(512, 6), @(400, 7), @(320, 8), @(240, 10))
     $size = 0
     foreach ($s in $steps) {
-        Write-Step ("PDF: contact sheet with frames at {0} px (long side)" -f $s[0])
+        Write-Step ("PDF ({0}): contact sheet with frames at {1} px (long side)" -f $suffix, $s[0])
         # A fresh folder, page and browser profile for each attempt, in case a browser process from
         # the previous attempt is still closing.
-        $tag = "$($s[0])"
+        $tag = "$suffix-$($s[0])"
         $names = New-Thumbs $frames (Join-Path $work "thumbs-$tag") $s[0] $s[1] $portrait
         $html = Join-Path $work "contact-sheet-$tag.html"
         Write-PdfHtml $html $ctx $frames $names "thumbs-$tag"
@@ -974,15 +1012,17 @@ function Get-SilenceNote($s, [double]$duration) {
     return ''
 }
 
-function Build-Cover($ctx, $audio, $narr, $frames) {
+function Build-Cover($ctx, $audio, $narr, $frames, $checks, $chg) {
     $sb = New-Object System.Text.StringBuilder
     [void]$sb.Append("<h1>Video review: $(Get-Html $ctx.Title)</h1><p class='muted'>$(Get-Html $ctx.SourceLine) &middot; made $(Get-Date -Format 'yyyy-MM-dd HH:mm') with review-video.ps1</p>")
     if ($script:Warnings.Count) {
         [void]$sb.Append('<h2>Warnings</h2><ul>'); foreach ($w in $script:Warnings) { [void]$sb.Append("<li class='warn'>$(Get-Html $w)</li>") }; [void]$sb.Append('</ul>')
     }
+    [void]$sb.Append((Build-ChangesHtml $chg))
     [void]$sb.Append('<h2>Summary</h2><table>')
     foreach ($row in $ctx.Summary) { [void]$sb.Append("<tr><th>$(Get-Html $row[0])</th><td>$(Get-Html $row[1])</td></tr>") }
     [void]$sb.Append('</table>')
+    [void]$sb.Append((Build-ChecksHtml $checks))
     if ($audio) {
         [void]$sb.Append('<h2>Audio findings</h2><ul>'); foreach ($n in (Get-AudioNotes $audio)) { [void]$sb.Append("<li>$(Get-Html $n)</li>") }; [void]$sb.Append('</ul>')
         if ($audio.Loudest.Count) {
@@ -1020,20 +1060,22 @@ function Build-Cover($ctx, $audio, $narr, $frames) {
     return $sb.ToString()
 }
 
-function Build-Report($ctx, $audio, $narr, $frames, $pdfInfo) {
+function Build-Report($ctx, $audio, $narr, $frames, $pdfInfo, $checks, $chg, $changesPdf) {
     $sb = New-Object System.Text.StringBuilder
     $nl = "`n"
     [void]$sb.Append("# Video review: $($ctx.Title)$nl$nl")
     [void]$sb.Append("$($ctx.SourceLine). Made $(Get-Date -Format 'yyyy-MM-dd HH:mm') by review-video.ps1 (ffmpeg $($script:FfmpegVersion)).$nl$nl")
     [void]$sb.Append("**How to use this report.** Every frame listed below is a PNG in ``frames/``, named ``<number>_<hh-mm-ss.mmm>_<reason>.png``. ")
     [void]$sb.Append("Open the frames alongside this report and check what is on screen against the narration given for that moment ")
-    [void]$sb.Append("(the line being spoken, or the line just spoken during a pause). Audio findings come first, then the narration timeline, then the frames.$nl$nl")
+    [void]$sb.Append("(the line being spoken, or the line just spoken during a pause) and against the on-screen text read by OCR. The changes since the last review (if any) come first, then audio, narration, the on-screen text checks and the frames.$nl$nl")
     if ($script:Warnings.Count) {
         [void]$sb.Append("## Warnings$nl$nl"); foreach ($w in $script:Warnings) { [void]$sb.Append("- **$w**$nl") }; [void]$sb.Append($nl)
     }
+    if ($chg) { [void]$sb.Append((Build-ChangesMarkdown $chg $nl)) }
     [void]$sb.Append("## Summary$nl$nl| | |$nl|---|---|$nl")
     foreach ($row in $ctx.Summary) { [void]$sb.Append("| $($row[0]) | $(Get-Md $row[1]) |$nl") }
     if ($pdfInfo) { [void]$sb.Append(('| PDF | {0} ({1:0.0} MB, frames at {2} px) |{3}' -f [IO.Path]::GetFileName($pdfInfo.Path), $pdfInfo.SizeMB, $pdfInfo.LongSide, $nl)) }
+    if ($changesPdf) { [void]$sb.Append(('| Changes PDF | {0} ({1:0.0} MB, changed frames only) |{2}' -f [IO.Path]::GetFileName($changesPdf.Path), $changesPdf.SizeMB, $nl)) }
     [void]$sb.Append($nl)
 
     [void]$sb.Append("## Audio$nl$nl")
@@ -1089,6 +1131,8 @@ function Build-Report($ctx, $audio, $narr, $frames, $pdfInfo) {
         [void]$sb.Append($nl)
     }
 
+    [void]$sb.Append((Build-ChecksMarkdown $checks $nl))
+
     [void]$sb.Append("## Frames$nl$nl")
     [void]$sb.Append("$(@($frames).Count) frames. ")
     if ($ctx.Mode -eq 'video') {
@@ -1096,11 +1140,16 @@ function Build-Report($ctx, $audio, $narr, $frames, $pdfInfo) {
         [void]$sb.Append("'end of scene', the finished slide just before the change, and 'scene change', the new scene 0.5 s after it settles (merged into a regular frame when one falls within 0.75 s).$nl$nl")
     }
     else { [void]$sb.Append("Rendered with ``npx remotion still`` from composition ``$($ctx.CompId)`` at $($ctx.Fps) fps.$nl$nl") }
-    [void]$sb.Append("| # | Time | Frame no. | Why | File | Narration at this moment |$nl|---|---|---|---|---|---|$nl")
+    [void]$sb.Append("On-screen text is in reading order with lines separated by `` / ``; possible misspellings are in **bold**.$nl$nl")
+    [void]$sb.Append("| # | Time | Frame no. | Why | File | Narration at this moment | On screen (OCR) | Flags |$nl|---|---|---|---|---|---|---|---|$nl")
     foreach ($f in $frames) {
         $n = ''
         if ($f.Narr) { $n = if ($f.Narr.Pause) { "_(pause; last line)_ $($f.Narr.Text)" } else { $f.Narr.Text } }
-        [void]$sb.Append("| $($f.Index) | $(Format-Time $f.Time) | $($f.Frame) | $($f.Why) | [$($f.Name)](frames/$($f.Name)) | $(Get-Md $n) |$nl")
+        $o = Get-Md $f.Text
+        foreach ($bw in @($f.Misspelt)) { $o = [regex]::Replace($o, '\b' + [regex]::Escape($bw) + '\b', "**$bw**") }
+        $fl = (@($f.Flags | Select-Object -Unique) -join '; ')
+        if ($f.Change) { $fl = ('changed since last review' + $(if ($fl) { "; $fl" } else { '' })) }
+        [void]$sb.Append("| $($f.Index) | $(Format-Time $f.Time) | $($f.Frame) | $($f.Why) | [$($f.Name)](frames/$($f.Name)) | $(Get-Md $n) | $o | $(Get-Md $fl) |$nl")
     }
     return $sb.ToString()
 }
@@ -1108,6 +1157,8 @@ function Build-Report($ctx, $audio, $narr, $frames, $pdfInfo) {
 # ---------------------------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------------------------
+
+. (Join-Path $PSScriptRoot 'review-checks.ps1')
 
 $exitCode = 0
 $work = $null
@@ -1141,6 +1192,19 @@ try {
 
     New-Item -ItemType Directory -Force -Path $OutDir | Out-Null
     $OutDir = (Resolve-Path -LiteralPath $OutDir).Path
+    # Keep the last run for the "changes since the last review" comparison.
+    $prevDir = $null
+    if ($CompareWith) {
+        if (-not (Test-Path -LiteralPath $CompareWith)) { throw "-CompareWith folder not found: $CompareWith" }
+        $prevDir = (Resolve-Path -LiteralPath $CompareWith).Path.TrimEnd('\')
+        if ($prevDir -ieq $OutDir) { $prevDir = Move-PreviousReview $OutDir }
+    } elseif (Test-Path -LiteralPath (Join-Path $OutDir 'review.json')) {
+        $prevDir = Move-PreviousReview $OutDir
+    } elseif (Test-Path -LiteralPath (Join-Path $OutDir 'previous\review.json')) {
+        # The last run stopped before finishing; compare with the review kept before it.
+        $prevDir = Join-Path $OutDir 'previous'
+    }
+    $previous = if ($prevDir) { Read-PreviousReview $prevDir } else { $null }
     $framesDir = Join-Path $OutDir 'frames'
     New-Item -ItemType Directory -Force -Path $framesDir | Out-Null
     # Clear frames from an earlier run (only files this script names), so the folder matches the report.
@@ -1192,6 +1256,29 @@ try {
     }
     foreach ($f in $frameList) { if ($narr.Matched) { $f.Narr = Get-NarrationAt $f.Time $narr.Lines } }
 
+    # On-screen text and the checks that use it
+    $checks = $null
+    if (-not $NoOcr) {
+        Write-Step "Text: reading the text in $($frameList.Count) frames (Windows OCR)"
+        Invoke-FrameOcr $frameList $work
+        Write-Step 'Text: spelling, reading time, numbers and safe areas'
+        $checks = [pscustomobject]@{
+            Spelling = Invoke-SpellCheck $frameList $narr.Lines $Project $work
+            Reading  = $(if ($ctx.Mode -eq 'video') { , @(Test-ReadingTime $frameList $script:SceneRuns $ctx.Duration) } else { $null })
+            Numbers  = $(if ($narr.Matched) { , @(Test-NumberMatch $frameList $narr.Lines) } else { $null })
+            Safe     = Test-SafeAreas $frameList $ctx.Width $ctx.Height
+        }
+    }
+
+    # Changes since the previous review
+    $sigSize = Get-SignatureSize $ctx.Width $ctx.Height
+    Set-FrameSignatures $frameList $work $sigSize[0] $sigSize[1]
+    $chg = $null
+    if ($previous) {
+        Write-Step "Changes: comparing with the review made $($previous.Made)"
+        $chg = Compare-WithPrevious $frameList $previous $sigSize[0] $sigSize[1] $OutDir
+    }
+
     # Summary rows shared by report.md and the PDF cover.
     $reasons = @{}
     foreach ($f in $frameList) { foreach ($w in ($f.Why -split ', ')) { $reasons[$w] = 1 + [int]$reasons[$w] } }
@@ -1212,34 +1299,63 @@ try {
     $narrLine = if ($narr.Matched) { '{0} of {1} lines placed ({2})' -f $narr.Matched, @($narr.Lines).Count, $narr.Group.Source }
     elseif ($narr.Group) { "found but not placed in time ($($narr.Group.Source))" } else { 'none found' }
     $summary += , @('Narration', $narrLine)
+    if ($checks) {
+        $summary += , @('On-screen text', ('{0} frames read; {1} possible spelling mistake(s)' -f @($frameList | Where-Object { $_.Text }).Count, @($checks.Spelling.Words).Count))
+        if ($null -ne $checks.Reading) { $summary += , @('Too quick to read', ('{0} of {1} slides (at {2} words/s)' -f @($checks.Reading | Where-Object { $_.Worst }).Count, @($checks.Reading).Count, $WordsPerSecond)) }
+        if ($null -ne $checks.Numbers) { $summary += , @('Spoken numbers not on screen', ('{0} of {1} lines with numbers' -f @($checks.Numbers | Where-Object { $_.Missing.Count }).Count, @($checks.Numbers).Count)) }
+        if ($null -ne $checks.Safe) { $summary += , @('Text in Shorts safe-area margins', "$(@($checks.Safe.Hits).Count)") }
+    }
+    if ($chg) { $summary += , @('Changed since last review', ('{0} of {1} frames' -f @($chg.Changed).Count, $frameList.Count)) }
     $ctx.Summary = $summary
 
-    $pdfInfo = $null
+    $pdfInfo = $null; $changesPdfInfo = $null
     if (-not $NoPdf) {
-        $ctx.CoverHtml = Build-Cover ([pscustomobject]$ctx) $audio $narr $frameList
+        $ctx.CoverHtml = Build-Cover ([pscustomobject]$ctx) $audio $narr $frameList $checks $chg
         $pdfInfo = New-ReviewPdf ([pscustomobject]$ctx) $frameList $OutDir $work
     }
+    if ($ChangesPdf) {
+        if (-not $chg) { Add-Warning 'No previous review to compare with, so no changes PDF was made. Run the review once, render again, then run it with -ChangesPdf.' }
+        elseif (-not @($chg.Changed).Count) { Add-Warning 'No frames changed since the last review, so no changes PDF was made.' }
+        else {
+            $cctx = [pscustomobject]$ctx
+            $cctx.CoverHtml = "<h1>Changes: $(Get-Html $ctx.Title)</h1><p class='muted'>$(Get-Html $ctx.SourceLine) &middot; made $(Get-Date -Format 'yyyy-MM-dd HH:mm') with review-video.ps1</p>" + (Build-ChangesHtml $chg)
+            $changesPdfInfo = New-ReviewPdf $cctx $chg.Changed $OutDir $work 'changes'
+        }
+    }
 
-    Write-Step 'Writing report.md'
+    Write-Step 'Writing report.md and review.json'
     $report = Join-Path $OutDir 'report.md'
-    Write-Utf8 $report (Build-Report ([pscustomobject]$ctx) $audio $narr $frameList $pdfInfo)
+    Write-Utf8 $report (Build-Report ([pscustomobject]$ctx) $audio $narr $frameList $pdfInfo $checks $chg $changesPdfInfo)
+    Write-ReviewJson (Join-Path $OutDir 'review.json') ([pscustomobject]$ctx) $frameList $sigSize[0] $sigSize[1]
 
     Write-Host ''
     Write-Host 'Done.' -ForegroundColor Green
     Write-Host "  Report: $report"
     Write-Host "  Frames: $framesDir ($($frameList.Count))"
     if ($pdfInfo) { Write-Host ('  PDF:    {0} ({1:0.0} MB)' -f $pdfInfo.Path, $pdfInfo.SizeMB) }
+    if ($changesPdfInfo) { Write-Host ('  Changes PDF: {0} ({1:0.0} MB)' -f $changesPdfInfo.Path, $changesPdfInfo.SizeMB) }
     if ($audio) {
         Write-Host ('  Audio:  {0}, true peak {1}, {2} silence(s) over {3} s, {4} possible click(s), {5} clipped sample(s)' -f `
             (Format-Db $audio.Integrated 'LUFS'), (Format-Db $audio.TruePeak 'dBTP'), $audio.Silences.Count, $MinSilence, $audio.Clicks.Count, $audio.Scan.ClippedSamples)
     }
     Write-Host "  Narration: $narrLine"
+    if ($checks) {
+        $line = '  Text:   {0} possible spelling mistake(s)' -f @($checks.Spelling.Words).Count
+        if ($null -ne $checks.Reading) { $line += ', {0} slide(s) too quick to read' -f @($checks.Reading | Where-Object { $_.Worst }).Count }
+        if ($null -ne $checks.Numbers) { $line += ', {0} line(s) with a spoken number not on screen' -f @($checks.Numbers | Where-Object { $_.Missing.Count }).Count }
+        if ($null -ne $checks.Safe) { $line += ', {0} text item(s) in Shorts safe-area margins' -f @($checks.Safe.Hits).Count }
+        Write-Host $line
+    }
+    if ($chg) { Write-Host ('  Changes: {0} of {1} frames changed since the review made {2}' -f @($chg.Changed).Count, $frameList.Count, $previous.Made) }
     if ($script:Warnings.Count) { Write-Host "  $($script:Warnings.Count) warning(s); see the top of report.md." -ForegroundColor Yellow }
 }
 catch {
     Write-Host ''
     Write-Host "FAILED: $($_.Exception.Message)" -ForegroundColor Red
-    if ($_.InvocationInfo -and $_.InvocationInfo.ScriptLineNumber) { Write-Host "  (at review-video.ps1 line $($_.InvocationInfo.ScriptLineNumber))" -ForegroundColor DarkGray }
+    if ($_.InvocationInfo -and $_.InvocationInfo.ScriptLineNumber) {
+        $where = if ($_.InvocationInfo.ScriptName) { [IO.Path]::GetFileName($_.InvocationInfo.ScriptName) } else { 'review-video.ps1' }
+        Write-Host "  (at $where line $($_.InvocationInfo.ScriptLineNumber))" -ForegroundColor DarkGray
+    }
     $exitCode = 1
 }
 finally {

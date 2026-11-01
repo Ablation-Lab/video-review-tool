@@ -9,10 +9,17 @@ can read without watching the video:
   1.5 seconds, and sudden clicks or pops, all with timestamps.
 - **Narration**: the line being spoken at each frame, when the project has a narration script,
   recording table, `voiceover.json` or subtitle file the script can match to the audio.
+- **On-screen text**: the text in every frame, read with Windows' built-in OCR, and four checks
+  on it: likely spelling mistakes, slides shown too briefly to read, numbers spoken in the
+  narration that aren't on screen at the time, and (for vertical Shorts) text in the areas YouTube
+  covers with its buttons and captions.
+- **Changes since the last render**: when the same video was reviewed before, the frames whose
+  picture changed, listed first, with an optional PDF of just those frames.
 - **report.md**: everything above in one file, linking each frame. Made for Claude Code, which can
   open the report and the frames together.
-- **A PDF** to attach to a Claude chat: a cover page with the audio findings, then a contact sheet
-  of 6 to 9 labelled frames per page, with the narration line under each frame. Kept under 20 MB.
+- **A PDF** to attach to a Claude chat: a cover page with the audio findings and checks, then a
+  contact sheet of 6 to 9 labelled frames per page, with any problems, the narration line and the
+  on-screen text under each frame. Kept under 20 MB.
 
 ## Requirements
 
@@ -29,11 +36,23 @@ can read without watching the video:
   with `ffmpeg -version`.
 - **Microsoft Edge or Google Chrome** for the PDF (Edge comes with Windows). Use `-NoPdf` to skip it.
 - **Remotion projects only**: Node.js, and `npm install` already run in the project.
+- **On-screen text checks**: nothing to install. They use the OCR and spell checker built into
+  Windows 10 and 11, through Windows PowerShell 5.1 (also built in). OCR needs a recognizer for your
+  language; English is normally there already. If it isn't, the script stops and says how to add
+  it (Settings > Time & language > Language & region). Use `-NoOcr` to skip these checks.
 
-The tool lives in `skills/video-review/`: `review-video.ps1`, `AudioScan.cs` (compiled by the
-script on each run, so keep it next to it) and `SKILL.md`. That way the folder can be installed on
-its own as a Claude Code skill (see [Using it with your AI](#using-it-with-your-ai)). The
-`review-video.ps1` at the root of the repo is a shortcut to it.
+The tool lives in `skills/video-review/`, so that folder can be installed on its own as a Claude
+Code skill (see [Using it with your AI](#using-it-with-your-ai)). Keep its files together:
+
+| File | Does |
+| --- | --- |
+| `review-video.ps1` | The tool. |
+| `review-checks.ps1` | The on-screen text checks and the comparison with the last review (loaded by the tool). |
+| `windows-text.ps1` | Calls Windows' OCR and spell checker (started by the tool). |
+| `AudioScan.cs` | Sample-level audio checks, narration matching and frame comparison (compiled by the tool on each run). |
+| `SKILL.md` | Instructions for Claude Code. |
+
+The `review-video.ps1` at the root of the repo is a shortcut to the tool.
 
 ## Running it
 
@@ -69,17 +88,20 @@ By default the pack goes in `<video name>-review\` next to the video, or in
 
 ```
 explainer-review\
-  report.md                 audio findings, narration timeline and the frame list
+  report.md                 changes, audio, narration, on-screen text checks and the frame list
   explainer-review.pdf      cover page and contact sheet, for a Claude chat
+  explainer-changes.pdf     only with -ChangesPdf: the frames that changed since the last review
+  review.json               frame data the next run compares with
   frames\
     0001_00-00-00.000_interval.png
     0006_00-00-08.733_end.png       finished slide just before a scene change
     0007_00-00-10.000_scene.png     new scene after the change has settled
     ...
+  previous\                 the last run, kept for the comparison (report, frames, PDFs)
 ```
 
-Frame names are `<number>_<hh-mm-ss.mmm>_<reason>.png`. Running the script again replaces the
-frames from the previous run.
+Frame names are `<number>_<hh-mm-ss.mmm>_<reason>.png`. Running the script again moves the last
+run into `previous\` (replacing the one before) and compares with it.
 
 ## Using it with your AI
 
@@ -104,9 +126,11 @@ Then ask in plain words, for example:
 
 > Check the slides in C:\path\to\remotion-project against the narration.
 
+> What changed in C:\path\to\video.mp4 since the last review?
+
 or type `/video-review C:\path\to\video.mp4`. Claude runs the tool, opens `report.md` and the
-frames, checks each slide against its narration line and reports problems with frame numbers and
-timestamps.
+frames, checks each slide against its narration line, goes through the on-screen text checks and
+reports problems with frame numbers and timestamps.
 
 To use the skill in one project only, copy the folder into that project's `.claude\skills\`
 folder instead.
@@ -131,12 +155,17 @@ Ask:
 > Run the video review tool on C:\path\to\video.mp4 and give me the path to the PDF, so I can
 > attach it to a Claude chat.
 
+For a re-render, ask for just the changes:
+
+> Run the video review tool on C:\path\to\video.mp4 with -ChangesPdf and give me the changes PDF.
+
 (Or run the tool yourself: the PDF is `<video name>-review\<video name>-review.pdf`.) Then attach
 the PDF to a chat and ask, for example:
 
-> This PDF is a review sheet for my video. The first page has the audio findings; then each frame
-> is shown with its timestamp and the narration line at that moment. Check every frame against its
-> narration line and list anything that doesn't match, with the frame number and timestamp.
+> This PDF is a review sheet for my video. The first pages have the audio findings and automatic
+> checks; then each frame is shown with its timestamp, any problems found (red), the narration line
+> at that moment and the on-screen text read by OCR (blue). Check every frame against its narration
+> line and list anything that doesn't match, with the frame number and timestamp.
 
 ## Options
 
@@ -157,6 +186,14 @@ the PDF to a chat and ask, for example:
 | `-NoAudio` | off | Remotion only: skip rendering the audio (no audio checks or narration). |
 | `-MaxPdfMB <MB>` | `20` | PDF size limit. Frames are made smaller until it fits. |
 | `-NoPdf` | off | Skip the PDF. |
+| `-NoOcr` | off | Skip the on-screen text and its checks (spelling, reading time, numbers, safe areas). |
+| `-OcrLanguage <tag>` | your Windows language | Language for OCR and spelling, e.g. `en-US`. |
+| `-WordList <file>` | none | Extra words the spelling check accepts, one per line. `review-words.txt` in the project folder is read automatically. |
+| `-WordsPerSecond <n>` | `3` | Reading speed for the reading-time check. |
+| `-NumberWordsFrom <n>` | `10` | Numbers spoken as words are checked from this value up ("five" is often said without being shown). Numbers written as digits in the narration are always checked. |
+| `-SafeMargins t,r,b,l` | `288,192,672,48` | Shorts safe-area margins in pixels at 1080x1920 (top, right, bottom, left). |
+| `-CompareWith <folder>` | the last run | A previous review folder to compare with, e.g. the review of an older file name. |
+| `-ChangesPdf` | off | Also make a PDF of only the frames that changed since the previous review. |
 | `-KeepWork` | off | Keep the temporary work folder, for debugging. |
 
 `Get-Help .\skills\video-review\review-video.ps1 -Full` shows the same descriptions.
@@ -188,6 +225,59 @@ lists the others with their counts.
 Clip files are found from the path in the table or JSON, then in `public\`, `public\audio\` and
 `audio\`, then anywhere in the project by name.
 
+## On-screen text checks
+
+Every frame is read three times with Windows OCR and the readings are merged: as it is (best for
+small text), with its colours inverted, and inverted at half size. Windows OCR reads dark text on a
+light background best; on dark slides it can miss big headline numbers at full size and read them
+fine once inverted and halved. The text of each frame is in the report's frame table and under
+each frame in the PDF.
+
+- **Spelling**: words the Windows spell checker (in your Windows language) rejects. To keep OCR
+  misreads out, a word is listed only when the original frame and an inverted copy both read it the
+  same way; words read only one way are listed separately as probable misreads. It also skips
+  words under 4 letters, words with digits, short all-caps words (acronyms), camelCase names,
+  words that appear in the narration, part-words from text being typed on (the start of a longer
+  word seen in another frame) and words in `review-words.txt` in the project folder (one per line).
+- **Reading time**: slides run from one scene change to the next. Text carried over from the
+  previous slide (headers, footers) doesn't count, and bare numbers don't count as words. Each new
+  line counts from when it first appears; a slide is flagged if, from any of those moments, the
+  words still to read need more than 0.5 s longer than is left, at `-WordsPerSecond` (3 by
+  default). The 0.5 s allows for frames being sampled every 2 s. Video files only, since it needs
+  the scene changes.
+- **Numbers**: each narration line with a number in it (digits such as 97, 3.7M, $2, 48%, 1,200, and
+  number words from `-NumberWordsFrom` up, such as "seventeen" or "three point seven million") is
+  checked against the text on screen from 0.5 s before the line to 1 s after it. A number that
+  doesn't appear is flagged, with the numbers that were on screen. "3.7 million" matches "3.7M" or
+  "3.7"; "48 percent" matches "48%". Needs narration placed in time.
+- **Shorts safe areas**: for vertical 9:16 videos, any text inside the margins YouTube Shorts
+  covers. YouTube publishes no official figure for organic Shorts. The default comes from Google's
+  *Universal Video Ad Safe Zones* sheet for vertical video (1080x1920): 288 px top, 192 px right,
+  672 px bottom, 48 px left. It is the only first-party guide and the most cautious one; third-party
+  estimates for ordinary Shorts are smaller (some use about 180 top, 120 right, 390 bottom, 60 left)
+  and disagree with each other. Use `-SafeMargins 180,120,390,60` or similar for a looser check.
+
+OCR is good on clear slide text but not perfect: it can misread small, faint or monospaced text (an
+I read as 1, "R1" as "RI"), so every flag is something to look at, not a verdict. When OCR misses a
+number entirely, the number check flags it as missing.
+
+## Changes since the last render
+
+Each run saves `review.json` (every frame's text and a small greyscale copy of its picture). The
+next run of the same video (same output folder) moves the last run into `previous\` and compares:
+a frame counts as changed when no frame of the previous review looks the same, so frames that only
+moved in time aren't listed. A "Changes since the last review (changes only)" section at the top of
+the report lists the changed frames, each with a link to the previous frame nearest in time and the
+words added and removed on screen. The report also counts previous frames that no longer appear.
+
+- To compare with the review of a different file (say `video-v2.mp4` against `video-v1.mp4`), add
+  `-CompareWith C:\path\to\video-v1-review`.
+- Add `-ChangesPdf` for `<name>-changes.pdf`: a cover listing the changes, then only the changed
+  frames, ready to attach to a chat.
+
+Re-encoding alone doesn't count as a change: in testing, re-encoded copies with a few planted
+edits showed exactly the edited frames as changed.
+
 ## How the checks work
 
 - **Scene changes**: ffmpeg compares frames 0.25 s apart (motion-graphics fades are too gradual to
@@ -212,6 +302,8 @@ Clip files are found from the path in the table or JSON, then in `public\`, `pub
   frames; the script lists them as a warning.
 - Narration matching needs the narration to be clearly audible. Loud music under the voice
   lowers the match scores.
+- OCR, spelling and the safe-area figures have the limits described in
+  [On-screen text checks](#on-screen-text-checks). The OCR passes add about 10 to 15 s per 100 frames.
 - The PDF is printed by Edge or Chrome in headless mode. If neither is installed, use `-NoPdf`.
 
 ## Privacy check

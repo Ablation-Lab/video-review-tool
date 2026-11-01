@@ -35,6 +35,38 @@ namespace VideoReview
         public double Score;  // Pearson correlation, -1..1
     }
 
+    public class FrameMatch
+    {
+        public int Index;     // closest frame in the other set, or -1
+        public int Changed;   // pixels that differ by more than the tolerance
+    }
+
+    // Compares frame signatures (small greyscale thumbnails of equal size, one byte per pixel) to
+    // find what changed between two renders.
+    public static class FrameDiff
+    {
+        public static FrameMatch[] Closest(byte[][] frames, byte[][] others, int tolerance)
+        {
+            var result = new FrameMatch[frames.Length];
+            for (int i = 0; i < frames.Length; i++)
+            {
+                var best = new FrameMatch { Index = -1, Changed = int.MaxValue };
+                byte[] a = frames[i];
+                for (int j = 0; j < others.Length; j++)
+                {
+                    byte[] b = others[j];
+                    if (b.Length != a.Length) continue;
+                    int n = 0;
+                    for (int k = 0; k < a.Length && n < best.Changed; k++)
+                        if (Math.Abs(a[k] - b[k]) > tolerance) n++;
+                    if (n < best.Changed) { best.Changed = n; best.Index = j; }
+                }
+                result[i] = best;
+            }
+            return result;
+        }
+    }
+
     public static class AudioScan
     {
         public const int Rate = 48000;
