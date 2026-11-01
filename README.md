@@ -29,8 +29,12 @@ subagents opening every frame, used up a whole usage session.
 
 - **Skim** (the default, and the one to use for long videos): the AI works from `report.md`, the
   OCR'd on-screen text and the scene-change frames (`end of scene` and `scene change`), and opens
-  a frame image only where something looks wrong: a flagged check, a narration line that doesn't
-  fit the text on screen, a changed frame, an audio problem at that moment.
+  a frame image where something looks wrong: a flagged check, a narration line that doesn't fit
+  the text on screen, a changed frame, an audio problem at that moment.
+- **Always some real frames**: even a skim or a text-only review opens a small sample of key
+  frames, about one fully built slide per scene, so the AI judges the visual style (layout,
+  overlaps, contrast, empty frames) and not just the words. It says at the end how many frames it
+  opened.
 - **Full review**: only when you ask for one. Use a cheaper model for any subagents (Sonnet, unless
   you ask for Opus), run at most two at a time, and cap how many frames get opened in total (100
   unless you say otherwise). For a long video, a larger `-Interval` cuts the frame count before the
@@ -99,6 +103,17 @@ Skim C:\path\to\video.mp4 with Sonnet and write a timeline file, then give me yo
 ```text
 Make the review PDF for C:\path\to\video.mp4 so I can attach it to a chat
 ```
+
+**Sharing with a chat AI**: for a long video, send a text timeline file plus a small key-frames
+PDF (about 15 to 20 frames: one fully built slide per scene and any problem frames), not the full
+contact sheet. Ask:
+
+```text
+Make a timeline file and a key-frames PDF of about 16 to 20 frames for C:\path\to\video.mp4, so I can attach both to a chat
+```
+
+The full contact-sheet PDF is best for short videos such as Shorts, or for just the changed frames
+(`-ChangesPdf`).
 
 ## Requirements
 

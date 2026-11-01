@@ -70,6 +70,12 @@ frame, once used up a whole usage session. So:
   only where something looks wrong: a flagged check, a narration line that doesn't fit the text on
   screen, a changed frame, an audio problem at that moment, or OCR text that is empty or garbled
   where there should be a slide. Say at the end that it was a skim and how many frames you opened.
+- **Always open some real frames**, in a skim, a text-only review or a timeline-only verdict
+  alike: about one fully built slide per scene (the `end of scene` frame, once everything has
+  appeared), or 15 to 20 spread across the video if there are no clear scenes. They show the visual
+  style (layout, overlaps, overflowing boxes, contrast, blank frames) that the text can't. For a
+  long video, have the Sonnet subagent that skims it open them. Always say at the end how many
+  frames were opened.
 - **Full review only when asked.** If the video is over 5 minutes (see `Length` and `Frames` in
   the summary of `report.md`), stop before opening any frames: tell the user how many frames there
   are and how many you would open, that a full review will use a lot of their usage, and ask
@@ -92,8 +98,20 @@ Rough frame counts: `-Interval 2` (the default) gives 30 regular frames per minu
 | "Do a full review of C:\path\to\video.mp4" | Full review, up to 100 frames (ask first if over 5 minutes). |
 | "...full review..., every frame, no cap" | Full review of every frame. Ask first if over 5 minutes, saying it can use a whole usage session. |
 | "...use Sonnet subagents" / "...use Opus" | That model for the subagents (Sonnet is the default anyway). |
-| "Skim it with Sonnet and write a timeline file, then give me your overall opinion from the timeline" | Run the tool, then have one Sonnet subagent skim the pack and write `timeline.md` in the review folder: one entry per scene with its time range, the narration in brief, the on-screen text in brief and any problems. Read only that file (open no frames yourself) and give an overall opinion: structure, pacing, clarity, and whether the slides support the narration. |
+| "Skim it with Sonnet and write a timeline file, then give me your overall opinion from the timeline" | Run the tool, then have one Sonnet subagent skim the pack, open the sample of key frames (one fully built slide per scene) and write `timeline.md` in the review folder: one entry per scene with its time range, the narration in brief, the on-screen text in brief, what the visuals look like and any problems. Read only that file (open no frames yourself) and give an overall opinion: structure, pacing, clarity, visual style, and whether the slides support the narration. Say how many frames were opened. |
 | "Make the review PDF for C:\path\to\video.mp4 so I can attach it to a chat" | Run the tool and give the full path of the PDF. Don't review or open frames unless asked. |
+| "Make a timeline file and a key-frames PDF ... so I can attach both to a chat" | See "Sharing with a chat AI" below. |
+
+### Sharing with a chat AI
+
+For a long video, don't attach the full contact-sheet PDF (hundreds of frames). Give the user two
+things: a text timeline file (`timeline.md`, as above) and a small **key-frames PDF** of about 15
+to 20 frames. Pick them from the existing pack, without rerunning the tool: one fully built slide
+per scene (the `end of scene` frame) plus any frames named in findings. Label each with its
+timestamp and scene name, keep the PDF under 10 MB, save it in the review folder, and give its full
+path. The tool has no option for this: build it from the PNGs in `frames/` (for example with
+ffmpeg and a short script) and don't change the user's project. The full PDF is best for short
+videos such as Shorts, or `-ChangesPdf` for just the changed frames.
 
 ## 3. Review the video
 
