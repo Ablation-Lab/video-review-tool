@@ -3,6 +3,8 @@
 A PowerShell script that turns a rendered video, or a Remotion project, into a review pack an AI
 can read without watching the video:
 
+For Claude: skills/video-review/, so that folder can be installed on its own as a Claude Code skill (see Using it with your AI).
+
 - **Frames**: a PNG at every scene change, one every 2 seconds and the last frame, numbered and
   named with their timestamps.
 - **Audio findings**: length, loudness (LUFS), true and sample peaks, clipping, silences longer than
@@ -20,6 +22,10 @@ can read without watching the video:
 - **A PDF** to attach to a Claude chat: a cover page with the audio findings and checks, then a
   contact sheet of 6 to 9 labelled frames per page, with any problems, the narration line and the
   on-screen text under each frame. Kept under 20 MB.
+
+You can copy/paste the pre made instructions i.e :  "Do a full review of C:\path\to\video.mp4"
+or 'Skim C:\path\to\video.mp4 with Sonnet and write a timeline file, then give me your overall opinion from the timeline'
+Or if you are only using a chat AI you can use:  'Make a timeline file and a key-frames PDF for C:\path\to\video.mp4, so I can attach both to a chat'
 
 ## Cost: skim versus full review
 
