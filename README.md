@@ -1,7 +1,7 @@
 # video-review-tool
 
 A PowerShell script that turns a rendered video, or a Remotion project, into a review pack an AI
-can read without watching the video:
+can analyze without watching the video:
 
 Tested on a 15 minute research video checking and offering corrections to claims the video made, various audio and video issues, and narration & text accuracy, it also gave its overall opinion along side a more detailed analysis. 
 
