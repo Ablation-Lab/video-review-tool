@@ -5,7 +5,7 @@ can read without watching the video:
 
 I wanted Claude to be able to 'Watch' a video or at least be able to review it for content accuracy, audio & visual issues, pacing etc, i also wanted it to be able to re-review changes made after a review.
 
-Tested on a 15 minute research video checking and offering corrections to claims the video made, a couple of audio issues and a slide fade issue, it gave its overall opinion and a more detailed analysis. 
+Tested on a 15 minute research video checking and offering corrections to claims the video made, various audio and video issues, and narration & text accuracy, it also gave its overall opinion along side a more detailed analysis. 
 
 Agents can rely on reading text summaries only for quick reviews or they can look at a mix of text, audio information and frame screenshots for a more detailed review.
 
