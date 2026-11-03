@@ -1,17 +1,19 @@
 # video-review-tool
 
-I really wanted Claude to be able to 'Watch' a video or at least be able to review it for content accuracy, audio & visual issues, pacing etc, i also wanted it to be able to re-review changes made after a review.
+A PowerShell script that turns a rendered video, or a Remotion project, into a review pack an AI
+can read without watching the video:
+
+I wanted Claude to be able to 'Watch' a video or at least be able to review it for content accuracy, audio & visual issues, pacing etc, i also wanted it to be able to re-review changes made after a review.
 
 Tested to review a 15 minute video which worked really well checking research claims the video made, a couple of audio issues and a slide fade issue, it gave its overall opinion and a more detailed analysis. 
 
 Agents can rely on reading text summaries only for quick reviews or they can look at a mix of text, audio information and frame screenshots for a more detailed review.
-You can copy/paste the pre made instructions i.e :  "Do a full review of C:\path\to\video.mp4"
-or 'Skim C:\path\to\video.mp4 with Sonnet and write a timeline file, then give me your overall opinion from the timeline'
-Or if you are only using a chat AI you can use:  'Make a timeline file and a key-frames PDF for C:\path\to\video.mp4, so I can attach both to a chat'
-You can put it inskills/video-review/, so that folder can be installed on its own as a Claude Code skill (see Using it with your AI).
 
-A PowerShell script that turns a rendered video, or a Remotion project, into a review pack an AI
-can read without watching the video:
+You can copy/paste the pre made instructions i.e :  "Do a full review of C:\path\to\video.mp4"
+
+or 'Skim C:\path\to\video.mp4 with Sonnet and write a timeline file, then give me your overall opinion from the timeline'
+
+Or if you are only using a chat AI you can use:  'Make a timeline file and a key-frames PDF for C:\path\to\video.mp4, so I can attach both to a chat'
 
 For Claude: skills/video-review/, so that folder can be installed on its own as a Claude Code skill (see [Using it with your AI](#using-it-with-your-ai))
 
