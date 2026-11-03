@@ -5,7 +5,7 @@ can read without watching the video:
 
 Tested on a 15 minute research video checking and offering corrections to claims the video made, various audio and video issues, and narration & text accuracy, it also gave its overall opinion along side a more detailed analysis. 
 
-Agents can rely on reading text summaries only for quick reviews or they can look at a mix of text, audio information and frame screenshots for a more detailed review.
+Agents can rely on reading text summaries only for quick reviews or they can look at a mix of text, audio information and frame screenshots for a more detailed analysis.
 
 You can copy/paste the pre made instructions i.e :  "Do a full review of C:\path\to\video.mp4"
 
