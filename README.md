@@ -3,7 +3,17 @@
 A PowerShell script that turns a rendered video, or a Remotion project, into a review pack an AI
 can analyze without watching the video:
 
-Tested on a 15 minute research video checking and offering corrections to claims the video made, various audio and video issues, and narration & text accuracy, it also gave its overall opinion along side a more detailed analysis. 
+- **Frames:** grabs a frame at every scene change and every 2 seconds, so a reviewer can see the video without watching it.
+- **Key frames:** picks one fully built slide per scene, plus any flagged moments, for a small PDF you can attach to a chat.
+- **Audio checks:** measures loudness, and flags clipping, clicks and long silences.
+- **Narration matching:** lines up each recorded voice clip with where it plays in the video.
+- **On-screen text:** reads all the text in the frames and flags possible spelling mistakes.
+- **Number matching:** checks that numbers in the narration match the ones on screen.
+- **Reading time:** flags text that disappears before anyone could read it.
+- **Changes since last render:** shows only what's different from the previous version.
+- **Shorts safe areas:** warns when text sits where YouTube's buttons would cover it.
+- **Reports:** writes a report file, a text timeline for long videos, and a PDF for chats.
+- **Claude Code skill:** you just ask in plain English. It skims by default, with optional full or every-frame reviews and limits to keep usage down.
 
 Agents can rely on reading text summaries only for quick reviews or they can look at a mix of text, audio information and frame screenshots for a more detailed analysis.
 
@@ -14,24 +24,6 @@ or 'Skim C:\path\to\video.mp4 with Sonnet and write a timeline file, then give m
 Or for chat  AI : 'Make a timeline file and a key-frames PDF for C:\path\to\video.mp4, so I can attach both to a chat'
 
 Can also be installed on its own as a Claude Code skill (see [Using it with your AI](#using-it-with-your-ai))
-
-- **Frames**: a PNG at every scene change, one every 2 seconds and the last frame, numbered and
-  named with their timestamps.
-- **Audio findings**: length, loudness (LUFS), true and sample peaks, clipping, silences longer than
-  1.5 seconds, and sudden clicks or pops, all with timestamps.
-- **Narration**: the line being spoken at each frame, when the project has a narration script,
-  recording table, `voiceover.json` or subtitle file the script can match to the audio.
-- **On-screen text**: the text in every frame, read with Windows' built-in OCR, and four checks
-  on it: likely spelling mistakes, slides shown too briefly to read, numbers spoken in the
-  narration that aren't on screen at the time, and (for vertical Shorts) text in the areas YouTube
-  covers with its buttons and captions.
-- **Changes since the last render**: when the same video was reviewed before, the frames whose
-  picture changed, listed first, with an optional PDF of just those frames.
-- **report.md**: everything above in one file, linking each frame. Made for Claude Code, which can
-  open the report and the frames together.
-- **A PDF** to attach to a Claude chat: a cover page with the audio findings and checks, then a
-  contact sheet of 6 to 9 labelled frames per page, with any problems, the narration line and the
-  on-screen text under each frame. Kept under 20 MB.
 
 You can copy/paste the pre made instructions i.e :  "Do a full review of C:\path\to\video.mp4"
 or 'Skim C:\path\to\video.mp4 with Sonnet and write a timeline file, then give me your overall opinion from the timeline'
