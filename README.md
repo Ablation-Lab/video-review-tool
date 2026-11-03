@@ -11,7 +11,7 @@ You can copy/paste the pre made instructions i.e :  "Do a full review of C:\path
 
 or 'Skim C:\path\to\video.mp4 with Sonnet and write a timeline file, then give me your overall opinion from the timeline'
 
-Or if you are only using a chat AI you can use:  'Make a timeline file and a key-frames PDF for C:\path\to\video.mp4, so I can attach both to a chat'
+Or if you a chat AI you can use: 'Make a timeline file and a key-frames PDF for C:\path\to\video.mp4, so I can attach both to a chat'
 
 Can also be installed on its own as a Claude Code skill (see [Using it with your AI](#using-it-with-your-ai))
 
