@@ -2,8 +2,7 @@
 
 I really wanted Claude to be able to 'Watch' a video or at least be able to review it for content accuracy, audio & visual issues, pacing etc, i also wanted it to be able to re-review changes made after a review.
 
-After working with Claude we created a skill/tool for this purpose with a few options to change how the review is created, you can also customize how your agents review the document.
-It has been tested and improved, it was used to review a 15 minute video which worked really well checking research claims the video made, a couple of audio issues and a slide fade issue, it gave its overall opinion and a more detailed analysis. 
+Tested to review a 15 minute video which worked really well checking research claims the video made, a couple of audio issues and a slide fade issue, it gave its overall opinion and a more detailed analysis. 
 
 Agents can rely on reading text summaries only for quick reviews or they can look at a mix of text, audio information and frame screenshots for a more detailed review.
 You can copy/paste the pre made instructions i.e :  "Do a full review of C:\path\to\video.mp4"
