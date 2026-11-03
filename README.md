@@ -13,7 +13,7 @@ or 'Skim C:\path\to\video.mp4 with Sonnet and write a timeline file, then give m
 
 Or if you are only using a chat AI you can use:  'Make a timeline file and a key-frames PDF for C:\path\to\video.mp4, so I can attach both to a chat'
 
-For Claude: skills/video-review/, so that folder can be installed on its own as a Claude Code skill (see [Using it with your AI](#using-it-with-your-ai))
+Can also be installed on its own as a Claude Code skill (see [Using it with your AI](#using-it-with-your-ai))
 
 - **Frames**: a PNG at every scene change, one every 2 seconds and the last frame, numbered and
   named with their timestamps.
