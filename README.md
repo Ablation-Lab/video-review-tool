@@ -3,7 +3,7 @@
 A PowerShell script that turns a rendered video, or a Remotion project, into a review pack an AI
 can read without watching the video:
 
-For Claude: skills/video-review/, so that folder can be installed on its own as a Claude Code skill (see Using it with your AI).
+For Claude: skills/video-review/, so that folder can be installed on its own as a Claude Code skill (see [Using it with your AI](#using-it-with-your-ai))
 
 - **Frames**: a PNG at every scene change, one every 2 seconds and the last frame, numbered and
   named with their timestamps.
