@@ -222,17 +222,25 @@ run into `previous\` (replacing the one before) and compares with it.
 ### Install it as a Claude Code skill
 
 The `skills/video-review` folder is a complete Claude Code skill: the instructions Claude follows
-(`SKILL.md`) and the tool itself. Copy it into your personal skills folder and every Claude Code
-session on your computer can use it. From PowerShell, in this repo:
+(`SKILL.md`) and the tool itself. Copy its files into a `video-review-skill` folder (the skill's
+name) in your personal skills folder and every Claude Code session on your computer can use it.
+From PowerShell, in this repo:
 
 ```powershell
-New-Item -ItemType Directory -Force "$HOME\.claude\skills" | Out-Null
-Copy-Item -Recurse -Force .\skills\video-review "$HOME\.claude\skills\"
+New-Item -ItemType Directory -Force "$HOME\.claude\skills\video-review-skill" | Out-Null
+Copy-Item -Recurse -Force .\skills\video-review\* "$HOME\.claude\skills\video-review-skill\"
 ```
 
-That gives you `<your home folder>\.claude\skills\video-review\SKILL.md`. Claude Code picks the
-skill up without a restart (if the `skills` folder didn't exist when the session started, type
+That gives you `<your home folder>\.claude\skills\video-review-skill\SKILL.md`. Claude Code picks
+the skill up without a restart (if the `skills` folder didn't exist when the session started, type
 `/reload-skills`). Run the same two lines again after you update this repo.
+
+Earlier versions installed the skill in a `video-review` folder. If you have one, remove it so
+Claude Code doesn't load the skill twice:
+
+```powershell
+Remove-Item -Recurse -Force "$HOME\.claude\skills\video-review" -ErrorAction SilentlyContinue
+```
 
 Then ask in plain words, for example:
 
@@ -242,12 +250,12 @@ Then ask in plain words, for example:
 
 > What changed in C:\path\to\video.mp4 since the last review?
 
-or type `/video-review C:\path\to\video.mp4`. Claude runs the tool, opens `report.md` and the
+or type `/video-review-skill C:\path\to\video.mp4`. Claude runs the tool, opens `report.md` and the
 frames, checks each slide against its narration line, goes through the on-screen text checks and
 reports problems with frame numbers and timestamps.
 
-To use the skill in one project only, copy the folder into that project's `.claude\skills\`
-folder instead.
+To use the skill in one project only, copy the files into a `video-review-skill` folder inside
+that project's `.claude\skills\` folder instead.
 
 ### Without skills
 
