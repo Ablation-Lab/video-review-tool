@@ -1,4 +1,4 @@
-# video-review-tool
+# Cutproof (video-review-tool)
 
 A PowerShell script that turns a rendered video, or a Remotion project, into a review pack an AI
 can analyze without watching the video:
