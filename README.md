@@ -36,6 +36,31 @@ Copy one of these into Claude Code and change the path:
 
 [How to ask](#how-to-ask) has more, and explains what each kind of review costs.
 
+## Try it with the sample
+
+The `samples` folder lets you try Cutproof on a 6-second test video before using your own. The
+video itself isn't stored in the repo, because Anthropic's plugin directory accepts only text and
+image files, so make it first. From this repo's folder (it needs ffmpeg):
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\samples\make-sample.ps1
+```
+
+That writes `samples\cutproof-sample.mp4` (about 16 KB): two slides of white text that ffmpeg
+draws from scratch, with no audio. Its narration is `samples\cutproof-sample.srt`, which Cutproof
+finds because it has the same name. Two problems are planted: the first slide says "sampel", and
+the second shows 25% while the narration says 35%.
+
+Then, in Claude Code in this folder, try the three example prompts on it:
+
+1. "Do a full review of samples\cutproof-sample.mp4"
+2. "Skim samples\cutproof-sample.mp4 with Sonnet and write a timeline file, then give me your overall opinion from the timeline"
+3. "Make a timeline file and a key-frames PDF for samples\cutproof-sample.mp4, so I can attach both to a chat"
+
+Each should name both problems with their timestamps and say there's no audio to check.
+[samples/expected-results.md](samples/expected-results.md) lists what the report should contain.
+The review pack goes in `samples\cutproof-sample-review\`; delete it and the video when you're done.
+
 ## Where it works
 
 - **Claude Code on Windows:** yes, with ffmpeg installed (see [Requirements](#requirements)).
@@ -78,6 +103,9 @@ Everything runs on your computer. The plugin adds one skill and no hooks, comman
     the project. The tool never runs `npx` and never installs or downloads packages: if Remotion
     isn't installed in the project, it stops. Remotion itself may download its own headless
     Chrome the first time it renders, as it does in any Remotion project.
+- **The sample maker** (`samples\make-sample.ps1`) runs only if you run it. It starts ffmpeg with
+  ffmpeg's built-in colour source and the Arial Bold font that comes with Windows, writes one MP4
+  next to itself, and reads nothing else. See [Try it with the sample](#try-it-with-the-sample).
 - **What it reads:** the video or Remotion project you name, and in that project folder the
   narration files, audio clips and `review-words.txt` it looks for (see [Narration](#narration));
   files you pass with `-Narration`, `-WordList` or `-CompareWith`; and the previous review kept in
