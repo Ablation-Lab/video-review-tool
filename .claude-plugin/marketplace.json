@@ -1,12 +1,12 @@
 {
   "name": "cutproof",
-  "description": "Cutproof from Ablation Lab: let Claude review a video or Remotion project without watching it.",
+  "description": "Cutproof from Ablation Lab: proofread a video without watching it.",
   "owner": { "name": "Ablation Lab" },
   "plugins": [
     {
       "name": "cutproof",
       "source": "./",
-      "description": "Review a rendered video or Remotion project without watching it, with problems reported by timestamp (Windows, ffmpeg).",
+      "description": "Proofread a video without watching it: typos, numbers that don't match the voiceover, text shown too briefly to read, and audio problems, flagged with timestamps (Windows, ffmpeg).",
       "version": "1.0.1"
     }
   ]

@@ -1,6 +1,10 @@
 # Cutproof (video-review-tool)
 
-A PowerShell script that turns a rendered video, or a Remotion project, into a review pack an AI
+Proofread a video without watching it.
+
+Cutproof checks your finished video the way an editor would, before you publish. It lines up your narration (from your script or subtitles) with what's on screen, then flags typos, numbers that don't match the voiceover, text that vanishes before anyone can read it, and audio problems, with timestamps. It runs entirely on your Windows PC and makes no network requests of its own.
+
+Under the hood, it's a PowerShell script that turns a rendered video, or a Remotion project, into a review pack an AI
 can analyze without watching the video:
 
 - **Frames:** grabs a frame at every scene change and every 2 seconds, so a reviewer can see the video without watching it.
