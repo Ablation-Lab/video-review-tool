@@ -1,7 +1,7 @@
 {
   "name": "cutproof",
   "displayName": "Cutproof",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Proofread a video without watching it. Cutproof lines up your narration with what's on screen and flags typos, numbers that don't match the voiceover, text shown too briefly to read, and audio problems, with timestamps. Runs on your Windows PC (needs ffmpeg) and makes no network requests of its own.",
   "author": { "name": "Ablation Lab" },
   "homepage": "https://github.com/Ablation-Lab/video-review-tool",
@@ -9,6 +9,7 @@
   "license": "MIT",
   "keywords": ["video", "remotion", "ocr", "audio", "review", "windows"],
   "icon": "./.claude-plugin/icon.png",
+  "documentationUrl": "https://github.com/Ablation-Lab/video-review-tool/blob/main/README.md",
   "supportUrl": "https://github.com/Ablation-Lab/video-review-tool/issues",
   "privacyPolicyUrl": "https://github.com/Ablation-Lab/video-review-tool#privacy"
 }
