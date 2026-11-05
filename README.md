@@ -15,19 +15,93 @@ can analyze without watching the video:
 - **Reports:** writes a report file, a text timeline for long videos, and a PDF for chats.
 - **Claude Code skill:** you just ask in plain English. It skims by default, with optional full or every-frame reviews and limits to keep usage down.
 
-Agents can rely on reading text summaries only for quick reviews or they can look at a mix of text, audio information and frame screenshots for a more detailed analysis.
+An AI can work from the text summaries alone for a quick review, or look at a mix of text, audio
+findings and frame images for a more detailed one.
 
-You can copy/paste the pre made instructions i.e :  "Do a full review of C:\path\to\video.mp4"
+It comes as a Claude Code plugin called **Cutproof** (see
+[Install it as a Claude Code plugin](#install-it-as-a-claude-code-plugin)), and its skill can also
+be installed on its own (see [Using it with your AI](#using-it-with-your-ai)).
 
-or 'Skim C:\path\to\video.mp4 with Sonnet and write a timeline file, then give me your overall opinion from the timeline'
+## Example prompts
 
-Or for chat  AI : 'Make a timeline file and a key-frames PDF for C:\path\to\video.mp4, so I can attach both to a chat'
+Copy one of these into Claude Code and change the path:
 
-Can also be installed on its own as a Claude Code skill (see [Using it with your AI](#using-it-with-your-ai))
+1. "Do a full review of C:\path\to\video.mp4"
+2. "Skim C:\path\to\video.mp4 with Sonnet and write a timeline file, then give me your overall opinion from the timeline"
+3. "Make a timeline file and a key-frames PDF for C:\path\to\video.mp4, so I can attach both to a chat"
 
-You can copy/paste the pre made instructions i.e :  "Do a full review of C:\path\to\video.mp4"
-or 'Skim C:\path\to\video.mp4 with Sonnet and write a timeline file, then give me your overall opinion from the timeline'
-Or if you are only using a chat AI you can use:  'Make a timeline file and a key-frames PDF for C:\path\to\video.mp4, so I can attach both to a chat'
+[How to ask](#how-to-ask) has more, and explains what each kind of review costs.
+
+## Where it works
+
+- **Claude Code on Windows:** yes, with ffmpeg installed (see [Requirements](#requirements)).
+  Install it as a plugin or as a skill folder.
+- **Chat in claude.ai and the Claude apps:** no. If you add Cutproof from the plugin directory, its
+  skill also loads in chat, but there it would have to run in Claude's code execution sandbox,
+  which can't run Windows PowerShell or ffmpeg on your computer or see your video files. Run the
+  tool yourself and attach the PDF it makes instead (see
+  [Getting a PDF to attach to a chat](#getting-a-pdf-to-attach-to-a-chat)).
+- **Cowork:** the skill loads there too, but the tool only works where it can run Windows
+  PowerShell and ffmpeg on your own Windows computer, with access to the video. It hasn't been
+  tested in Cowork.
+- **macOS and Linux:** not supported. The tool relies on Windows PowerShell and the OCR and spell
+  checker built into Windows.
+
+A plugin you add to your claude.ai account also appears in Claude Code as a synced plugin at the
+next session start, so you don't need to install it there separately.
+
+## What this plugin runs, sends and fetches
+
+Everything runs on your computer. The plugin adds one skill and no hooks, commands or servers.
+
+- **The command Claude runs.** The skill pre-approves one command, so Claude Code runs the tool
+  without asking each time: `powershell -NoProfile -ExecutionPolicy Bypass -File "<skill folder>/review-video.ps1"`
+  with any arguments (the video or project path and the options). `-ExecutionPolicy Bypass` lets
+  the tool's unsigned scripts run even where Windows' script policy would block them. It applies
+  to that one PowerShell process only and doesn't change your system's policy. Nothing else is
+  pre-approved.
+- **The programs the tool starts:**
+  - `ffmpeg` and `ffprobe` from your PATH, to take frames, find scene changes and measure the audio.
+  - Windows PowerShell 5.1 (`powershell.exe`), as a separate process running `windows-text.ps1`,
+    which uses the OCR and spell checker built into Windows.
+  - Microsoft Edge or Google Chrome in headless mode, with a throwaway profile in the work folder,
+    to print the PDF from a local HTML page.
+  - `AudioScan.cs`, the bundled C# source, which PowerShell compiles in memory with `Add-Type` on
+    each run. It starts ffmpeg to decode the audio.
+  - **Remotion projects only:** the project's own Remotion CLI (`node_modules\@remotion\cli`),
+    run with Node.js, to bundle the project and render stills and the audio. That runs the
+    project's own code, so only review projects you trust; Claude asks first if you didn't make
+    the project. The tool never runs `npx` and never installs or downloads packages: if Remotion
+    isn't installed in the project, it stops. Remotion itself may download its own headless
+    Chrome the first time it renders, as it does in any Remotion project.
+- **What it reads:** the video or Remotion project you name, and in that project folder the
+  narration files, audio clips and `review-words.txt` it looks for (see [Narration](#narration));
+  files you pass with `-Narration`, `-WordList` or `-CompareWith`; and the previous review kept in
+  `previous\`.
+- **What it writes:**
+  - The review pack: `<video name>-review\` next to the video, `out\<composition>-review\` inside
+    a Remotion project, or the folder you give with `-OutDir`. Each run moves the last run's files
+    into `previous\`, replacing the run kept there before. Only files the tool wrote are moved or
+    deleted, so other files in that folder are left alone.
+  - A work folder, `%TEMP%\video-review-<id>`, deleted at the end unless you add `-KeepWork`.
+- **What it sends and fetches:** nothing. The tool makes no network requests (see the Remotion
+  note above). Frames and the report reach Anthropic only the way anything in your conversation
+  does: when Claude opens them, or when you attach the PDF to a chat.
+
+## Privacy
+
+Cutproof collects nothing. There is no telemetry, no account and no server.
+
+- **Read:** the video or Remotion project you point it at; in its project folder, the narration
+  files, audio clips and `review-words.txt` it looks for; files you pass with `-Narration`,
+  `-WordList` or `-CompareWith`; and the previous review kept in `previous\`. Nothing else.
+- **Written:** only the review pack and a temporary work folder, both on your computer (see
+  [What it writes](#what-this-plugin-runs-sends-and-fetches)).
+- **Sent:** nothing, by the tool. Claude sees frames and the report only when it opens them in
+  your conversation, and a chat AI sees the PDF only if you attach it.
+
+Questions, bugs and security reports:
+[GitHub issues](https://github.com/Ablation-Lab/video-review-tool/issues).
 
 ## Cost: skim versus full review
 
@@ -139,8 +213,9 @@ short videos such as Shorts, or for just the changed frames (`-ChangesPdf`).
   with `ffmpeg -version`.
 - **Microsoft Edge or Google Chrome** for the PDF (Edge comes with Windows). Use `-NoPdf` to skip it.
 - **Remotion projects only**: Node.js, and `npm install` already run in the project. The tool
-  runs `npx remotion` in that project, which runs the project's own code (its Remotion config and
-  components), so only review Remotion projects you trust.
+  runs the project's own Remotion CLI with Node (never `npx`, so nothing is downloaded), which runs
+  the project's own code (its Remotion config and components), so only review Remotion projects
+  you trust.
 - **On-screen text checks**: nothing to install. They use the OCR and spell checker built into
   Windows 10 and 11, through Windows PowerShell 5.1 (also built in). OCR needs a recognizer for your
   language; English is normally there already. If it isn't, the script stops and says how to add
@@ -153,6 +228,7 @@ Code skill (see [Using it with your AI](#using-it-with-your-ai)). Keep its files
 | --- | --- |
 | `review-video.ps1` | The tool. |
 | `review-checks.ps1` | The on-screen text checks and the comparison with the last review (loaded by the tool). |
+| `key-frames.ps1` | Builds `key-frames.pdf` for `-KeyFramesPdf` (loaded by the tool). |
 | `windows-text.ps1` | Calls Windows' OCR and spell checker (started by the tool). |
 | `AudioScan.cs` | Sample-level audio checks, narration matching and frame comparison (compiled by the tool on each run). |
 | `SKILL.md` | Instructions for Claude Code. |
@@ -217,7 +293,8 @@ explainer-review\
 ```
 
 Frame names are `<number>_<hh-mm-ss.mmm>_<reason>.png`. Running the script again moves the last
-run into `previous\` (replacing the one before) and compares with it.
+run into `previous\` (replacing the one before) and compares with it. Only the files the script
+wrote are moved or deleted, so it's safe to point `-OutDir` at a folder that holds other files.
 
 ## Using it with your AI
 
@@ -267,15 +344,19 @@ The repo is also a Claude Code plugin, and its own plugin marketplace, so you ca
 skill without copying files and update it with one command. In Claude Code 2.1.275 or later:
 
 ```text
-/plugin install video-review-skill --marketplace Ablation-Lab/video-review-tool
+/plugin install cutproof --marketplace Ablation-Lab/video-review-tool
 ```
 
 On older versions, run `/plugin marketplace add Ablation-Lab/video-review-tool`, then
-`/plugin install video-review-skill@video-review-skill`. To update it later, run
-`claude plugin update video-review-skill@video-review-skill`.
+`/plugin install cutproof@cutproof`. To update it later, run
+`claude plugin update cutproof@cutproof`.
 
-The plugin contains the same skill folder, so it works the same way. Ask in plain words as above,
-or type `/video-review-skill:video-review-skill C:\path\to\video.mp4`. Use either the plugin or a
+If you installed it earlier under its old name, `video-review-skill`, remove that first with
+`/plugin uninstall video-review-skill@video-review-skill` and
+`/plugin marketplace remove video-review-skill`, then install Cutproof as above.
+
+The plugin is called Cutproof and contains the same skill folder, so it works the same way. Ask in
+plain words as above, or type `/cutproof:video-review-skill C:\path\to\video.mp4`. Use either the plugin or a
 copied skill folder, not both, or Claude Code loads the skill twice.
 
 ### claude.ai
@@ -495,9 +576,9 @@ edits showed exactly the edited frames as changed.
   catches clicks, digital pops, and audio that starts or stops without a fade. Speech, including
   plosives, stays well below the default threshold. A quiet click under loud speech can be missed.
 - **Clipping**: samples at or above `-ClipDb`.
-- **Remotion projects**: the project is bundled once, each frame is rendered with
-  `npx remotion still`, and unless `-NoAudio` is given the audio is rendered alone with
-  `npx remotion render --codec=wav`, which is quick because no video frames are rendered.
+- **Remotion projects**: the project is bundled once with its own Remotion CLI, each frame is
+  rendered with `remotion still`, and unless `-NoAudio` is given the audio is rendered alone with
+  `remotion render --codec=wav`, which is quick because no video frames are rendered.
 
 ### Limits
 
@@ -509,7 +590,22 @@ edits showed exactly the edited frames as changed.
   [On-screen text checks](#on-screen-text-checks). The OCR passes add about 10 to 15 s per 100 frames.
 - The PDF is printed by Edge or Chrome in headless mode. If neither is installed, use `-NoPdf`.
 
-## Privacy check
+## Maintainers: tests
+
+Two PowerShell test scripts need no ffmpeg, network or Pester. Each exits with code 0 when every
+check passes:
+
+- `tests\Move-PreviousReview.Tests.ps1` checks that each run keeps the last review in
+  `previous\` and never moves or deletes files the tool didn't write.
+- `tests\Remotion-Cli.Tests.ps1` checks, with a fake `@remotion/cli` package, that a Remotion
+  project's own CLI is run with Node and never through `npx` (it needs Node.js).
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\Move-PreviousReview.Tests.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\Remotion-Cli.Tests.ps1
+```
+
+## Maintainers: privacy check
 
 This repo uses the same fail-loudly privacy check as the other Ablation Lab repos.
 `scripts/privacy-check.sh` scans the staged files for personal emails, keys and tokens, local

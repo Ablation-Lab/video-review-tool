@@ -1,11 +1,14 @@
 {
-  "name": "video-review-skill",
-  "displayName": "Video Review",
-  "version": "1.0.0",
+  "name": "cutproof",
+  "displayName": "Cutproof",
+  "version": "1.0.1",
   "description": "Lets Claude review a rendered video or Remotion project without watching it: frames at scene changes, on-screen text, narration and audio checks, with problems reported by timestamp (Windows, ffmpeg).",
   "author": { "name": "Ablation Lab" },
   "homepage": "https://github.com/Ablation-Lab/video-review-tool",
   "repository": "https://github.com/Ablation-Lab/video-review-tool",
   "license": "MIT",
-  "keywords": ["video", "remotion", "ocr", "audio", "review", "windows"]
+  "keywords": ["video", "remotion", "ocr", "audio", "review", "windows"],
+  "icon": "./.claude-plugin/icon.png",
+  "supportUrl": "https://github.com/Ablation-Lab/video-review-tool/issues",
+  "privacyPolicyUrl": "https://github.com/Ablation-Lab/video-review-tool#privacy"
 }

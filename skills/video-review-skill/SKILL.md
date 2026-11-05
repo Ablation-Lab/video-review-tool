@@ -26,8 +26,8 @@ powershell -NoProfile -ExecutionPolicy Bypass -File "${CLAUDE_SKILL_DIR}/review-
 ```
 
 - **Video file** (MP4, MOV and so on): frames every 2 s, around each scene change and at the end.
-- **Remotion project folder**: stills rendered with `npx remotion still` (no full render needed)
-  and the audio rendered on its own. It uses the first composition unless `-Composition <id>` is
+- **Remotion project folder**: stills rendered with the project's own `remotion still` (no full
+  render needed) and the audio rendered on its own. It uses the first composition unless `-Composition <id>` is
   given; the output lists the others. It needs `npm install` already run in the project.
 
 Useful options (all optional):

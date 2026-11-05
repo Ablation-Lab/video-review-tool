@@ -432,16 +432,58 @@ function Test-SafeAreas($frames, [int]$w, [int]$h) {
 # Changes since the previous review
 # ---------------------------------------------------------------------------------------------
 
-function Move-PreviousReview([string]$outDir) {
-    # Keeps the last run in <OutDir>\previous so the next run can compare with it.
-    $prev = Join-Path $outDir 'previous'
-    if (Test-Path -LiteralPath $prev) { Remove-Item -LiteralPath $prev -Recurse -Force }
-    New-Item -ItemType Directory -Force -Path $prev | Out-Null
-    foreach ($name in @('frames', 'review.json', 'report.md')) {
-        $p = Join-Path $outDir $name
-        if (Test-Path -LiteralPath $p) { Move-Item -LiteralPath $p -Destination (Join-Path $prev $name) }
+# Frame images a review saves in <OutDir>\frames, such as 0001_00-00-02.000_scene.png.
+$script:FrameNamePattern = '^\d{4}_\d\d-\d\d-\d\d\.\d{3}_[a-z0-9]+\.png$'
+
+function Get-ReviewFileNames([string]$dir) {
+    # The files the review in $dir wrote there: report.md, review.json, key-frames.pdf, and
+    # <name>-review.pdf and <name>-changes.pdf, with <name> taken from its review.json. Any other
+    # file in the folder isn't the tool's, so it is never moved or deleted.
+    $names = @('report.md', 'review.json', 'key-frames.pdf')
+    $json = Join-Path $dir 'review.json'
+    if (Test-Path -LiteralPath $json -PathType Leaf) {
+        $j = $null
+        try { $j = [IO.File]::ReadAllText($json) | ConvertFrom-Json } catch { }
+        $base = $null
+        if ($j -and $j.PSObject.Properties['baseName'] -and $j.baseName) { $base = [string]$j.baseName }
+        elseif ($j -and $j.source -and $j.mode -eq 'remotion') { $base = ([string]$j.source) -replace '\s\(.*\)$', '' }
+        elseif ($j -and $j.source) { $base = [IO.Path]::GetFileNameWithoutExtension([string]$j.source) }
+        if ($base) { $names += "$base-review.pdf", "$base-changes.pdf" }
     }
-    Get-ChildItem -LiteralPath $outDir -Filter '*.pdf' | Move-Item -Destination $prev
+    return $names
+}
+
+function Move-ReviewFiles([string]$from, [string]$to) {
+    # Moves the review in $from to $to (or deletes it when $to is empty): only the files it wrote
+    # and the frame images in its frames folder. Folders left empty are removed.
+    $names = @(Get-ReviewFileNames $from)
+    if ($to) { New-Item -ItemType Directory -Force -Path $to | Out-Null }
+    foreach ($name in $names) {
+        $p = Join-Path $from $name
+        if (-not (Test-Path -LiteralPath $p -PathType Leaf)) { continue }
+        if ($to) { Move-Item -LiteralPath $p -Destination (Join-Path $to $name) -Force } else { Remove-Item -LiteralPath $p -Force }
+    }
+    $frames = Join-Path $from 'frames'
+    if (Test-Path -LiteralPath $frames -PathType Container) {
+        $own = @(Get-ChildItem -LiteralPath $frames -File | Where-Object { $_.Name -match $script:FrameNamePattern })
+        if ($to) {
+            $dest = Join-Path $to 'frames'
+            New-Item -ItemType Directory -Force -Path $dest | Out-Null
+            $own | Move-Item -Destination $dest -Force
+        } else {
+            $own | Remove-Item -Force
+        }
+        if (-not (Get-ChildItem -LiteralPath $frames -Force)) { Remove-Item -LiteralPath $frames -Force }
+    }
+}
+
+function Move-PreviousReview([string]$outDir) {
+    # Keeps the last run in <OutDir>\previous so the next run can compare with it. The run kept
+    # there before is deleted first. Only files the tool wrote are moved or deleted, so other files
+    # in a folder given with -OutDir, or put in previous\, are left alone.
+    $prev = Join-Path $outDir 'previous'
+    if (Test-Path -LiteralPath $prev -PathType Container) { Move-ReviewFiles $prev '' }
+    Move-ReviewFiles $outDir $prev
     return $prev
 }
 
@@ -522,7 +564,7 @@ function Write-ReviewJson([string]$file, $ctx, $frames, [int]$sw, [int]$sh) {
             lines = @($f.Lines | ForEach-Object { $_.Text }); flags = @($f.Flags | Select-Object -Unique); sig = $(if ($f.Sig) { [Convert]::ToBase64String($f.Sig) } else { $null }) }
     }
     $doc = [ordered]@{ tool = 'video-review'; version = 2; made = (Get-Date -Format 'yyyy-MM-dd HH:mm'); source = $ctx.Title
-        mode = $ctx.Mode; width = $ctx.Width; height = $ctx.Height; duration = [Math]::Round($ctx.Duration, 3); sigW = $sw; sigH = $sh; frames = $list }
+        baseName = $ctx.BaseName; mode = $ctx.Mode; width = $ctx.Width; height = $ctx.Height; duration = [Math]::Round($ctx.Duration, 3); sigW = $sw; sigH = $sh; frames = $list }
     Write-Utf8 $file (ConvertTo-Json -InputObject $doc -Depth 5 -Compress)
 }
 

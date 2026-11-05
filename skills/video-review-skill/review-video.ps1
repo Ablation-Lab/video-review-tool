@@ -15,8 +15,8 @@
       reading time, spoken numbers missing from the screen and YouTube Shorts safe areas;
     - what changed since the previous review of the same video (kept in <OutDir>\previous);
     - report.md (for Claude Code: open it with the frames) and a PDF (to attach to a chat).
-  Remotion project folder: renders stills at chosen frames with npx remotion still (no full render
-  needed) and, unless -NoAudio, renders the audio track alone for the same checks.
+  Remotion project folder: renders stills at chosen frames with the project's own Remotion CLI
+  (remotion still, run with Node, never through npx; no full render needed) and, unless -NoAudio, renders the audio track alone for the same checks.
 
 .EXAMPLE
   .\review-video.ps1 .\out\explainer.mp4
@@ -796,24 +796,44 @@ function Save-Frames($list, [string]$framesDir) {
 # Remotion
 # ---------------------------------------------------------------------------------------------
 
-function Invoke-Npx([string[]]$ArgList, [string]$What, [string]$project) {
-    return Invoke-Tool $script:Npx $ArgList $What -WorkDir $project
+function Get-RemotionCli([string]$cliDir) {
+    # The script that the project's own @remotion/cli package runs as its "remotion" command, read
+    # from the "bin" field of its package.json. It must be inside that package folder.
+    $pkgJson = Join-Path $cliDir 'package.json'
+    if (-not (Test-Path -LiteralPath $pkgJson -PathType Leaf)) { throw "Remotion's CLI in $cliDir has no package.json. Run 'npm install' in the project first." }
+    $p = [IO.File]::ReadAllText($pkgJson) | ConvertFrom-Json
+    $bin = if ($p.bin -is [string]) { $p.bin } elseif ($p.bin -and $p.bin.PSObject.Properties['remotion']) { $p.bin.remotion } else { $null }
+    if (-not $bin) { throw "Remotion's CLI in $cliDir doesn't name its remotion command." }
+    $root = [IO.Path]::GetFullPath($cliDir).TrimEnd('\') + '\'
+    $file = [IO.Path]::GetFullPath((Join-Path $cliDir $bin))
+    if (-not $file.StartsWith($root, [StringComparison]::OrdinalIgnoreCase) -or -not (Test-Path -LiteralPath $file -PathType Leaf)) {
+        throw "Remotion's CLI in $cliDir is incomplete. Run 'npm install' in the project first."
+    }
+    return $file
+}
+
+function Invoke-Remotion([string[]]$ArgList, [string]$What, [string]$project) {
+    # Runs the project's own Remotion CLI with Node directly (not through npx), so nothing is
+    # ever downloaded from npm.
+    return Invoke-Tool $script:Node (@($script:RemotionCli) + @($ArgList)) $What -WorkDir $project
 }
 
 function Initialize-Remotion([string]$project, [string]$work) {
     $pkg = Join-Path $project 'package.json'
     if (-not (Test-Path -LiteralPath $pkg)) { throw "$project has no package.json, so it is not a Remotion project. Pass a video file or a Remotion project folder." }
     if ([IO.File]::ReadAllText($pkg) -notmatch '"remotion"\s*:') { throw "$pkg does not list remotion as a dependency." }
-    if (-not (Test-Path -LiteralPath (Join-Path $project 'node_modules\@remotion\cli'))) {
+    $cliDir = Join-Path $project 'node_modules\@remotion\cli'
+    if (-not (Test-Path -LiteralPath $cliDir)) {
         throw "Remotion's CLI is not installed in $project. Run 'npm install' in that folder first."
     }
-    $script:Npx = Get-ToolPath 'npx.cmd'; if (-not $script:Npx) { $script:Npx = Get-ToolPath 'npx' }
-    if (-not $script:Npx) { throw 'npx not found. Install Node.js (winget install OpenJS.NodeJS.LTS) and open a new PowerShell window.' }
+    $script:RemotionCli = Get-RemotionCli $cliDir
+    $script:Node = Get-ToolPath 'node.exe'; if (-not $script:Node) { $script:Node = Get-ToolPath 'node' }
+    if (-not $script:Node) { throw 'Node.js not found. Install it (winget install OpenJS.NodeJS.LTS) and open a new PowerShell window.' }
 
     Write-Step 'Remotion: bundling the project once (reused for every still)'
     $bundle = Join-Path $work 'bundle'
-    [void](Invoke-Npx @('remotion', 'bundle', '--out-dir', $bundle, '--log=error') 'npx remotion bundle' $project)
-    $list = Invoke-Npx @('remotion', 'compositions', $bundle) 'npx remotion compositions' $project
+    [void](Invoke-Remotion @('bundle', '--out-dir', $bundle, '--log=error') 'remotion bundle' $project)
+    $list = Invoke-Remotion @('compositions', $bundle) 'remotion compositions' $project
     $esc = [char]27
     $comps = @()
     foreach ($line in ($list.Out -split "`r?`n")) {
@@ -822,7 +842,7 @@ function Initialize-Remotion([string]$project, [string]$work) {
             $comps += [pscustomobject]@{ Id = $Matches[1]; Fps = [double]$Matches[2]; Width = [int]$Matches[3]; Height = [int]$Matches[4]; Frames = [int]$Matches[5] }
         }
     }
-    if (-not $comps.Count) { throw "Could not read any compositions from 'npx remotion compositions'. Output was:`n$($list.Out)" }
+    if (-not $comps.Count) { throw "Could not read any compositions from 'remotion compositions'. Output was:`n$($list.Out)" }
     $comp = if ($Composition) { $comps | Where-Object { $_.Id -eq $Composition } | Select-Object -First 1 } else { $comps[0] }
     if (-not $comp) { throw "Composition '$Composition' not found. Available: $(($comps | ForEach-Object { $_.Id }) -join ', ')" }
     if (-not $Composition -and $comps.Count -gt 1) { Write-Host "    Using the first composition, $($comp.Id). Others: $((@($comps | Select-Object -Skip 1) | ForEach-Object { $_.Id }) -join ', ')" }
@@ -854,8 +874,8 @@ function Export-RemotionFrames([string]$project, $rem, [string]$framesDir, [stri
         $k++
         Write-Host ("    still {0}/{1}: frame {2} ({3})" -f $k, $ns.Count, $n, (Format-Time ($n / $c.Fps)))
         $png = Join-Path $raw ('r{0:000000}.png' -f $n)
-        [void](Invoke-Npx @('remotion', 'still', $rem.Bundle, $c.Id, $png, "--frame=$n", '--image-format=png', '--overwrite', '--log=error') "npx remotion still (frame $n)" $project)
-        if (-not (Test-Path -LiteralPath $png)) { throw "npx remotion still did not write $png" }
+        [void](Invoke-Remotion @('still', $rem.Bundle, $c.Id, $png, "--frame=$n", '--image-format=png', '--overwrite', '--log=error') "remotion still (frame $n)" $project)
+        if (-not (Test-Path -LiteralPath $png)) { throw "remotion still did not write $png" }
         $list.Add([pscustomobject]@{ Raw = $png; Time = $n / $c.Fps; Frame = $n; Reasons = @($targets[$n]) })
     }
     return Save-Frames $list $framesDir
@@ -1149,7 +1169,7 @@ function Build-Report($ctx, $audio, $narr, $frames, $pdfInfo, $checks, $chg, $ch
         [void]$sb.Append("Taken every $Interval s and at the last frame. Around each scene change (a scene score of at least $SceneThreshold between samples 0.25 s apart) there are two: ")
         [void]$sb.Append("'end of scene', the finished slide just before the change, and 'scene change', the new scene 0.5 s after it settles (merged into a regular frame when one falls within 0.75 s).$nl$nl")
     }
-    else { [void]$sb.Append("Rendered with ``npx remotion still`` from composition ``$($ctx.CompId)`` at $($ctx.Fps) fps.$nl$nl") }
+    else { [void]$sb.Append("Rendered with the project's own ``remotion still`` from composition ``$($ctx.CompId)`` at $($ctx.Fps) fps.$nl$nl") }
     [void]$sb.Append("On-screen text is in reading order with lines separated by `` / ``; possible misspellings are in **bold**.$nl$nl")
     [void]$sb.Append("| # | Time | Frame no. | Why | File | Narration at this moment | On screen (OCR) | Flags |$nl|---|---|---|---|---|---|---|---|$nl")
     foreach ($f in $frames) {
@@ -1233,7 +1253,7 @@ try {
     $framesDir = Join-Path $OutDir 'frames'
     New-Item -ItemType Directory -Force -Path $framesDir | Out-Null
     # Clear frames from an earlier run (only files this script names), so the folder matches the report.
-    Get-ChildItem -LiteralPath $framesDir -Filter '*.png' | Where-Object { $_.Name -match '^\d{4}_\d\d-\d\d-\d\d\.\d{3}_[a-z0-9]+\.png$' } | Remove-Item -Force
+    Get-ChildItem -LiteralPath $framesDir -Filter '*.png' | Where-Object { $_.Name -match $script:FrameNamePattern } | Remove-Item -Force
     Write-Host "Output: $OutDir"
 
     $audio = $null; $noAudioReason = ''
@@ -1252,14 +1272,14 @@ try {
     } else {
         $c = $rem.Comp
         $duration = $c.Frames / $c.Fps
-        Write-Step "Remotion: rendering stills of $($c.Id) with npx remotion still"
+        Write-Step "Remotion: rendering stills of $($c.Id) with the project's remotion still"
         $frameList = @(Export-RemotionFrames $item.FullName $rem $framesDir $work)
         $media = $null
         if ($NoAudio) { $noAudioReason = 'Audio was skipped (-NoAudio).' }
         else {
             Write-Step 'Remotion: rendering the audio track only (no video frames)'
             $audioFile = Join-Path $work 'audio.wav'
-            $ar = Invoke-Npx @('remotion', 'render', $rem.Bundle, $c.Id, $audioFile, '--codec=wav', '--log=error') 'npx remotion render (audio only)' $item.FullName
+            $ar = Invoke-Remotion @('render', $rem.Bundle, $c.Id, $audioFile, '--codec=wav', '--log=error') 'remotion render (audio only)' $item.FullName
             if (-not (Test-Path -LiteralPath $audioFile)) { throw 'The audio render did not produce a file.' }
             $media = Get-MediaInfo $audioFile
             if ($media.HasAudio) { $audio = Invoke-AudioChecks $audioFile $media } else { $noAudioReason = 'The composition rendered without audio.' }
