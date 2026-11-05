@@ -1,0 +1,13 @@
+{
+  "name": "video-review-skill",
+  "description": "Video Review from Ablation Lab: let Claude review a video or Remotion project without watching it.",
+  "owner": { "name": "Ablation Lab" },
+  "plugins": [
+    {
+      "name": "video-review-skill",
+      "source": "./",
+      "description": "Review a rendered video or Remotion project without watching it, with problems reported by timestamp (Windows, ffmpeg).",
+      "version": "1.0.0"
+    }
+  ]
+}

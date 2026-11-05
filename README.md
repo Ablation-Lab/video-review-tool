@@ -261,6 +261,23 @@ reports problems with frame numbers and timestamps.
 To use the skill in one project only, copy the files into a `video-review-skill` folder inside
 that project's `.claude\skills\` folder instead.
 
+### Install it as a Claude Code plugin
+
+The repo is also a Claude Code plugin, and its own plugin marketplace, so you can install the
+skill without copying files and update it with one command. In Claude Code 2.1.275 or later:
+
+```text
+/plugin install video-review-skill --marketplace Ablation-Lab/video-review-tool
+```
+
+On older versions, run `/plugin marketplace add Ablation-Lab/video-review-tool`, then
+`/plugin install video-review-skill@video-review-skill`. To update it later, run
+`claude plugin update video-review-skill@video-review-skill`.
+
+The plugin contains the same skill folder, so it works the same way. Ask in plain words as above,
+or type `/video-review-skill:video-review-skill C:\path\to\video.mp4`. Use either the plugin or a
+copied skill folder, not both, or Claude Code loads the skill twice.
+
 ### claude.ai
 
 You can upload the skill to claude.ai (Customize > Skills), but it only does its work in Claude
