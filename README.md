@@ -64,6 +64,9 @@ The review pack goes in `samples\cutproof-sample-review\`; delete it and the vid
 
 ## Where it works
 
+Cutproof runs only in Claude Code on Windows. In Claude chat or Cowork you can still ask Claude to
+write you a ready-to-paste Claude Code prompt for reviewing your video, then run it in Claude Code.
+
 - **Claude Code on Windows:** yes, with ffmpeg installed (see [Requirements](#requirements)).
   Install it as a plugin or as a skill folder.
 - **Chat in claude.ai and the Claude apps:** no. If you add Cutproof from the plugin directory, its
