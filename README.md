@@ -287,10 +287,23 @@ $tmp = Join-Path $env:TEMP 'video-review-skill-upload'
 Remove-Item -Recurse -Force $tmp -ErrorAction SilentlyContinue
 New-Item -ItemType Directory $tmp | Out-Null
 Copy-Item -Recurse .\skills\video-review-skill $tmp
-$skill = Join-Path $tmp 'video-review-skill\SKILL.md'
-[IO.File]::WriteAllLines($skill, [string[]](Get-Content $skill | Where-Object { $_ -notmatch '^argument-hint:' }))
-Compress-Archive -Force (Join-Path $tmp 'video-review-skill') "$env:TEMP\video-review-skill.zip"
+$root = Join-Path $tmp 'video-review-skill'
+$skill = Join-Path $root 'SKILL.md'
+[IO.File]::WriteAllLines($skill, [string[]](Get-Content -Encoding UTF8 $skill | Where-Object { $_ -notmatch '^argument-hint:' }))
+Add-Type -AssemblyName System.IO.Compression.FileSystem
+$zip = "$env:TEMP\video-review-skill.zip"
+Remove-Item $zip -ErrorAction SilentlyContinue
+$archive = [IO.Compression.ZipFile]::Open($zip, 'Create')
+Get-ChildItem $root -File -Recurse | ForEach-Object {
+    $name = 'video-review-skill/' + $_.FullName.Substring($root.Length + 1).Replace('\', '/')
+    [IO.Compression.ZipFileExtensions]::CreateEntryFromFile($archive, $_.FullName, $name) | Out-Null
+}
+$archive.Dispose()
 ```
+
+Don't use `Compress-Archive` or another zip tool that stores paths with `\` (Windows
+PowerShell 5.1's does): claude.ai rejects that zip with "Zip file contains path with invalid
+characters". The snippet above names each file with `/`.
 
 Then upload `video-review-skill.zip` from your temp folder (type `%TEMP%` in File Explorer's
 address bar to find it). After you update this repo, build and upload it again.
