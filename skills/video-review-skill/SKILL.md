@@ -2,7 +2,6 @@
 name: video-review-skill
 description: Lets Claude "watch" a video without playing it. It turns a rendered video or a Remotion project into frames taken at scene changes and every 2 seconds, reads the on-screen text in each frame, matches the narration to what is on screen, and checks the audio for loudness, clipping, clicks and long silences. It then reports problems with timestamps, such as misspelled text, text shown too briefly to read, numbers in the narration that don't match the screen, and text hidden behind the buttons and captions in YouTube Shorts. Needs Windows and ffmpeg. Use it when someone asks to review, check or proofread a video or a Remotion render before publishing, asks whether the slides match the narration or what changed since the last render, or wants a PDF of a video to attach to a chat.
 argument-hint: <video file or Remotion project folder> [options]
-allowed-tools: Bash(powershell -NoProfile -ExecutionPolicy Bypass -File "${CLAUDE_SKILL_DIR}/review-video.ps1" *) PowerShell(powershell -NoProfile -ExecutionPolicy Bypass -File "${CLAUDE_SKILL_DIR}/review-video.ps1" *)
 ---
 
 # Video review

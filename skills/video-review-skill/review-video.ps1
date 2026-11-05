@@ -246,11 +246,11 @@ function Assert-Ffmpeg {
     if (-not $script:Ffmpeg -or -not $script:Ffprobe) {
         $missing = @(); if (-not $script:Ffmpeg) { $missing += 'ffmpeg' }; if (-not $script:Ffprobe) { $missing += 'ffprobe' }
         throw @"
-$($missing -join ' and ') not found on PATH. Install ffmpeg (it includes ffprobe) with one of:
+$($missing -join ' and ') not found. Install ffmpeg (it includes ffprobe) with one of:
     winget install --id Gyan.FFmpeg -e
     choco install ffmpeg
-or download a build from https://www.gyan.dev/ffmpeg/builds/ and add its bin folder to PATH.
-Then open a new PowerShell window (so PATH is reloaded) and run this script again.
+or see Requirements in the README for other builds.
+Then open a new PowerShell window and run this script again.
 "@
     }
     $v = (Invoke-Tool $script:Ffmpeg @('-hide_banner', '-version') 'ffmpeg -version').Out
@@ -258,14 +258,21 @@ Then open a new PowerShell window (so PATH is reloaded) and run this script agai
 }
 
 function Find-Browser {
+    $pf86 = [Environment]::GetFolderPath('ProgramFilesX86')
+    $pf = [Environment]::GetFolderPath('ProgramFiles')
+    $local = [Environment]::GetFolderPath('LocalApplicationData')
     $candidates = @(
-        "${env:ProgramFiles(x86)}\Microsoft\Edge\Application\msedge.exe",
-        "$env:ProgramFiles\Microsoft\Edge\Application\msedge.exe",
-        "$env:ProgramFiles\Google\Chrome\Application\chrome.exe",
-        "${env:ProgramFiles(x86)}\Google\Chrome\Application\chrome.exe",
-        "$env:LOCALAPPDATA\Google\Chrome\Application\chrome.exe"
+        @($pf86, 'Microsoft\Edge\Application\msedge.exe'),
+        @($pf, 'Microsoft\Edge\Application\msedge.exe'),
+        @($pf, 'Google\Chrome\Application\chrome.exe'),
+        @($pf86, 'Google\Chrome\Application\chrome.exe'),
+        @($local, 'Google\Chrome\Application\chrome.exe')
     )
-    foreach ($c in $candidates) { if ($c -and (Test-Path -LiteralPath $c)) { return $c } }
+    foreach ($c in $candidates) {
+        if (-not $c[0]) { continue }
+        $p = Join-Path $c[0] $c[1]
+        if (Test-Path -LiteralPath $p) { return $p }
+    }
     foreach ($n in 'msedge', 'chrome') { $p = Get-ToolPath $n; if ($p) { return $p } }
     return $null
 }
@@ -591,7 +598,7 @@ function Invoke-NarrationMatch($groups, [string]$projectRoot, $audio) {
             }
         }
         $video = $audio.Scan.Envelope
-        $envCache = @{}
+        $clipCache = @{}
         $best = $null
         foreach ($g in $clipGroups) {
             $lines = @($g.Lines | ForEach-Object { $_.PSObject.Copy() })
@@ -600,15 +607,15 @@ function Invoke-NarrationMatch($groups, [string]$projectRoot, $audio) {
                 $path = Resolve-Clip $l.Clip @($g.Folder, $projectRoot) $index
                 if (-not $path) { $missing++; continue }
                 if ($l.ClipLen -le 0) {
-                    if (-not $envCache.ContainsKey("dur|$path")) { $envCache["dur|$path"] = (Get-MediaInfo $path).Duration }
-                    $l.ClipLen = $envCache["dur|$path"]
+                    if (-not $clipCache.ContainsKey("dur|$path")) { $clipCache["dur|$path"] = (Get-MediaInfo $path).Duration }
+                    $l.ClipLen = $clipCache["dur|$path"]
                 }
                 $len = [Math]::Min($l.ClipLen, 4.0)
-                $key = "$path|$($l.ClipStart)|$len"
-                if (-not $envCache.ContainsKey($key)) { $envCache[$key] = [VideoReview.AudioScan]::Envelope($script:Ffmpeg, $path, $l.ClipStart, $len) }
-                $clipEnv = $envCache[$key]
+                $clipId = "$path|$($l.ClipStart)|$len"
+                if (-not $clipCache.ContainsKey($clipId)) { $clipCache[$clipId] = [VideoReview.AudioScan]::Envelope($script:Ffmpeg, $path, $l.ClipStart, $len) }
+                $clipShape = $clipCache[$clipId]
                 $to = if ($first) { $video.Length } else { $from + 9000 + [int]($l.ClipLen * 100) }
-                $m = [VideoReview.AudioScan]::FindBest($video, $clipEnv, $from, $to)
+                $m = [VideoReview.AudioScan]::FindBest($video, $clipShape, $from, $to)
                 $need = if ($len -lt 0.8) { 0.8 } else { 0.7 }
                 if ($m.Index -ge 0 -and $m.Score -ge $need) {
                     $l.Start = $m.Index / 100.0; $l.End = $l.Start + $l.ClipLen; $l.Score = $m.Score
@@ -787,7 +794,7 @@ function Save-Frames($list, [string]$framesDir) {
                 switch ($_) { 'interval' { "every $Interval s" } 'scene' { 'scene change' } 'sceneend' { 'end of scene' } 'last' { 'last frame' } 'chosen' { 'chosen frame' } default { $_ } }
             }) -join ', '
         $result += [pscustomobject]@{ Index = $i; Time = $f.Time; Frame = $f.Frame; Name = $name; Path = $dest; Why = $why; Narr = $null
-            Lines = @(); Text = ''; Misspelt = @(); Flags = (New-Object System.Collections.Generic.List[string]); Sig = $null; Change = $null; TokA = @(); TokB = @() }
+            Lines = @(); Text = ''; Misspelt = @(); Flags = (New-Object System.Collections.Generic.List[string]); Sig = $null; Change = $null; WordsA = @(); WordsB = @() }
     }
     return $result
 }

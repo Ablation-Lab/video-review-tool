@@ -7,7 +7,7 @@
       "name": "cutproof",
       "source": "./",
       "description": "Proofread a video without watching it: typos, numbers that don't match the voiceover, text shown too briefly to read, and audio problems, flagged with timestamps (Windows, ffmpeg).",
-      "version": "1.0.4"
+      "version": "1.0.5"
     }
   ]
 }

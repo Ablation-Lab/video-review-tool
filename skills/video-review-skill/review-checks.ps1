@@ -29,14 +29,14 @@ function Get-NormText([string]$t) {
 }
 
 function Get-WordCount([string]$t) {
-    # Words to read: tokens that start with a letter. Bare numbers (grid IDs, counters) read at a
+    # Words to read: runs of letters and digits that start with a letter. Bare numbers (grid IDs, counters) read at a
     # glance, so they don't count.
     if (-not $t) { return 0 }
     return ([regex]::Matches($t, "\p{L}[\p{L}\p{Nd}]*(?:['\u2019][\p{L}]+)?")).Count
 }
 
 function Invoke-WindowsText([string]$mode, [string]$inFile, [string]$outFile, [string]$what) {
-    $ps = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
+    $ps = Join-Path ([Environment]::GetFolderPath('System')) 'WindowsPowerShell\v1.0\powershell.exe'
     if (-not (Test-Path -LiteralPath $ps)) { throw "Windows PowerShell 5.1 ($ps) is needed for Windows OCR and spelling, and was not found. Run with -NoOcr." }
     $helper = Join-Path $PSScriptRoot 'windows-text.ps1'
     if (-not (Test-Path -LiteralPath $helper)) { throw "windows-text.ps1 is missing; it must sit next to review-video.ps1 ($helper)." }
@@ -143,8 +143,8 @@ function Invoke-FrameOcr($frames, [string]$work) {
         $c = @(ConvertTo-OcrLines $res[2 * $n + $i] 2)
         # Words each reading saw, for the spelling check: a real typo reads the same way in the
         # original and in an inverted copy.
-        $fa[$i].TokA = @($a | ForEach-Object { Get-SpellTokens $_.Text })
-        $fa[$i].TokB = @(@($b) + @($c) | ForEach-Object { Get-SpellTokens $_.Text })
+        $fa[$i].WordsA = @($a | ForEach-Object { Get-SpellWords $_.Text })
+        $fa[$i].WordsB = @(@($b) + @($c) | ForEach-Object { Get-SpellWords $_.Text })
         $lines = Merge-OcrLines (Merge-OcrLines $a $b) $c
         # Reading order: top to bottom, then left to right.
         $fa[$i].Lines = @($lines | Sort-Object @{ Expression = { [Math]::Round($_.Y / 40) } }, X)
@@ -161,7 +161,7 @@ function Invoke-FrameOcr($frames, [string]$work) {
 $script:QuoteChars = [char[]]@(39, 0x2019)
 $script:TrimChars = [char[]](".,;:!?`"'()[]{}<>*#&+=~^%`$@|".ToCharArray() + [char[]]@(0x201C, 0x201D, 0x2018, 0x2019, 0x2026, 0x2022, 0x00B7, 0x00A3, 0x20AC))
 
-function Get-SpellTokens([string]$text) {
+function Get-SpellWords([string]$text) {
     $out = @()
     foreach ($raw in ($text -split '\s+')) {
         $t = $raw.Trim($script:TrimChars)
@@ -198,7 +198,7 @@ function Invoke-SpellCheck($frames, $narrLines, [string]$projectRoot, [string]$w
     $allowed = Get-AllowedWords $narrLines $projectRoot
     $unique = New-Object 'System.Collections.Generic.HashSet[string]'
     foreach ($f in $frames) {
-        foreach ($l in $f.Lines) { foreach ($t in (Get-SpellTokens $l.Text)) { if (-not $allowed.Set.Contains($t)) { [void]$unique.Add($t) } } }
+        foreach ($l in $f.Lines) { foreach ($t in (Get-SpellWords $l.Text)) { if (-not $allowed.Set.Contains($t)) { [void]$unique.Add($t) } } }
     }
     $result = [pscustomobject]@{ Checked = $unique.Count; Words = @(); AllowFiles = $allowed.Files; ReadOnce = @(); Typing = @() }
     if (-not $unique.Count) { return $result }
@@ -210,13 +210,13 @@ function Invoke-SpellCheck($frames, $narrLines, [string]$projectRoot, [string]$w
     # A rejected word counts only when both OCR readings of some frame (as it is, and inverted) saw
     # it: OCR misreads of small or stylised text rarely come out the same both ways, real typos do.
     $both = New-Object 'System.Collections.Generic.HashSet[string]'
-    foreach ($f in $frames) { foreach ($t in @($f.TokA)) { if (@($f.TokB) -ccontains $t) { [void]$both.Add($t) } } }
+    foreach ($f in $frames) { foreach ($t in @($f.WordsA)) { if (@($f.WordsB) -ccontains $t) { [void]$both.Add($t) } } }
     $result.ReadOnce = @($names | Where-Object { -not $both.Contains($_) })
     $names = @($names | Where-Object { $both.Contains($_) })
     # Text being typed on screen shows part-words ("Revi" before "Reviewers"): skip a rejected word
     # that is the start of a longer word read in another frame.
     $all = New-Object 'System.Collections.Generic.HashSet[string]' ([StringComparer]::OrdinalIgnoreCase)
-    foreach ($f in $frames) { foreach ($t in @($f.TokA) + @($f.TokB)) { [void]$all.Add($t) } }
+    foreach ($f in $frames) { foreach ($t in @($f.WordsA) + @($f.WordsB)) { [void]$all.Add($t) } }
     $result.Typing = @($names | Where-Object { $w = $_; @($all | Where-Object { $_.Length -gt $w.Length -and $_.StartsWith($w, [StringComparison]::OrdinalIgnoreCase) }).Count -gt 0 })
     $names = @($names | Where-Object { $result.Typing -notcontains $_ })
     if (-not $names.Count) { return $result }
@@ -225,7 +225,7 @@ function Invoke-SpellCheck($frames, $narrLines, [string]$projectRoot, [string]$w
     foreach ($f in $frames) {
         $hit = @()
         foreach ($l in $f.Lines) {
-            foreach ($t in (Get-SpellTokens $l.Text)) {
+            foreach ($t in (Get-SpellWords $l.Text)) {
                 if ($byWord.Contains($t)) {
                     $e = $byWord[$t]
                     if (-not $e.Frames.Contains($f.Index)) { $e.Frames.Add($f.Index) }
@@ -418,9 +418,9 @@ function Test-SafeAreas($frames, [int]$w, [int]$h) {
             if ($l.X -lt $left) { $edges += 'left' }
             if ($l.X + $l.W -gt $right) { $edges += 'right' }
             if (-not $edges.Count) { continue }
-            $key = (Get-NormText $l.Text) + '|' + ($edges -join ',')
-            if (-not $hits.Contains($key)) { $hits[$key] = [pscustomobject]@{ Text = $l.Text; Edges = $edges; Frames = New-Object System.Collections.Generic.List[int]; First = $f.Time; Last = $f.Time } }
-            $e = $hits[$key]; if (-not $e.Frames.Contains($f.Index)) { $e.Frames.Add($f.Index) }; $e.Last = $f.Time
+            $lineId = (Get-NormText $l.Text) + '|' + ($edges -join ',')
+            if (-not $hits.Contains($lineId)) { $hits[$lineId] = [pscustomobject]@{ Text = $l.Text; Edges = $edges; Frames = New-Object System.Collections.Generic.List[int]; First = $f.Time; Last = $f.Time } }
+            $e = $hits[$lineId]; if (-not $e.Frames.Contains($f.Index)) { $e.Frames.Add($f.Index) }; $e.Last = $f.Time
             $edgesHere += $edges
         }
         if ($edgesHere.Count) { $f.Flags.Add('safe area: text in the ' + ((@($edgesHere | Select-Object -Unique)) -join ', ') + ' margin') }

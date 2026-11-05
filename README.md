@@ -47,7 +47,8 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\samples\make-sample.ps1
 ```
 
 That writes `samples\cutproof-sample.mp4` (about 16 KB): two slides of white text that ffmpeg
-draws from scratch, with no audio. Its narration is `samples\cutproof-sample.srt`, which Cutproof
+draws from scratch from `samples\cutproof-sample-slides.ass`, with no audio. It needs an ffmpeg
+build with libass, which the builds in [Requirements](#requirements) include. Its narration is `samples\cutproof-sample.srt`, which Cutproof
 finds because it has the same name. Two problems are planted: the first slide says "sampel", and
 the second shows 25% while the narration says 35%.
 
@@ -83,12 +84,12 @@ next session start, so you don't need to install it there separately.
 
 Everything runs on your computer. The plugin adds one skill and no hooks, commands or servers.
 
-- **The command Claude runs.** The skill pre-approves one command, so Claude Code runs the tool
-  without asking each time: `powershell -NoProfile -ExecutionPolicy Bypass -File "<skill folder>/review-video.ps1"`
-  with any arguments (the video or project path and the options). `-ExecutionPolicy Bypass` lets
-  the tool's unsigned scripts run even where Windows' script policy would block them. It applies
-  to that one PowerShell process only and doesn't change your system's policy. Nothing else is
-  pre-approved.
+- **The command Claude runs.** `powershell -NoProfile -ExecutionPolicy Bypass -File "<skill folder>/review-video.ps1"`
+  with the video or project path and the options. The skill pre-approves nothing, so Claude Code
+  shows you the command and asks before each run, unless your own permission settings already
+  allow it. `-ExecutionPolicy Bypass` lets the tool's unsigned scripts run even where Windows'
+  script policy would block them. It applies to that one PowerShell process only and doesn't
+  change your system's policy.
 - **The programs the tool starts:**
   - `ffmpeg` and `ffprobe` from your PATH, to take frames, find scene changes and measure the audio.
   - Windows PowerShell 5.1 (`powershell.exe`), as a separate process running `windows-text.ps1`,
@@ -103,9 +104,10 @@ Everything runs on your computer. The plugin adds one skill and no hooks, comman
     the project. The tool never runs `npx` and never installs or downloads packages: if Remotion
     isn't installed in the project, it stops. Remotion itself may download its own headless
     Chrome the first time it renders, as it does in any Remotion project.
-- **The sample maker** (`samples\make-sample.ps1`) runs only if you run it. It starts ffmpeg with
-  ffmpeg's built-in colour source and the Arial Bold font that comes with Windows, writes one MP4
-  next to itself, and reads nothing else. See [Try it with the sample](#try-it-with-the-sample).
+- **The sample maker** (`samples\make-sample.ps1`) runs only if you run it. It runs one fixed
+  ffmpeg command: ffmpeg's built-in colour source, with the slides' text from
+  `samples\cutproof-sample-slides.ass` drawn in the Arial font Windows already has. It writes one
+  MP4 next to itself and reads nothing else. See [Try it with the sample](#try-it-with-the-sample).
 - **What it reads:** the video or Remotion project you name, and in that project folder the
   narration files, audio clips and `review-words.txt` it looks for (see [Narration](#narration));
   files you pass with `-Narration`, `-WordList` or `-CompareWith`; and the previous review kept in

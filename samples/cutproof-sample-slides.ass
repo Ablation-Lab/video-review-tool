@@ -1,0 +1,16 @@
+[Script Info]
+; Cutproof's sample slides. make-sample.ps1 has ffmpeg draw them with its ass filter.
+ScriptType: v4.00+
+PlayResX: 960
+PlayResY: 540
+WrapStyle: 2
+ScaledBorderAndShadow: yes
+
+[V4+ Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+Style: Slide,Arial,64,&H00FFFFFF,&H00FFFFFF,&H00000000,&H00000000,-1,0,0,0,100,100,0,0,1,0,0,5,0,0,0,1
+
+[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+Dialogue: 0,0:00:00.00,0:00:03.00,Slide,,0,0,0,,Welcome to the Cutproof sampel
+Dialogue: 0,0:00:03.00,0:00:06.00,Slide,,0,0,0,,Sales grew 25% this year
