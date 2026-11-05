@@ -263,17 +263,37 @@ that project's `.claude\skills\` folder instead.
 
 ### claude.ai
 
-The skill can't do its work in claude.ai. It runs PowerShell, ffmpeg and Windows' own OCR and
-spell checker on your computer, and skills uploaded to claude.ai run in Anthropic's Linux sandbox,
-which has none of these and can't see your video files. Use it in Claude Code on Windows. If you
-want Claude in claude.ai to look at a video, run the tool yourself and attach the PDF it makes
-(see [Getting a PDF to attach to a chat](#getting-a-pdf-to-attach-to-a-chat)).
+You can upload the skill to claude.ai (Customize > Skills), but it only does its work in Claude
+Code on Windows. It runs PowerShell, ffmpeg and Windows' own OCR and spell checker on your
+computer. Skills in claude.ai run in Claude's code execution sandbox instead, where the tool can't
+run and can't see your video files. If you want Claude in claude.ai to look at a video, run the
+tool yourself and attach the PDF it makes (see
+[Getting a PDF to attach to a chat](#getting-a-pdf-to-attach-to-a-chat)).
 
-So don't upload it to claude.ai. Anthropic's docs say claude.ai rejects skills that use Claude
-Code-only fields such as this skill's `argument-hint`. And a skill you do turn on in claude.ai
-also loads in Claude Code 2.1.273 or later when you're signed in with the same account (as
-`anthropic-skills:video-review-skill`), so with a local copy installed too, Claude Code would
-load it twice.
+What uploading does give you: a skill turned on in claude.ai also loads in Claude Code 2.1.273 or
+later when you're signed in with the same account, as `anthropic-skills:video-review-skill`
+(see [Anthropic's skills docs](https://code.claude.com/docs/en/skills)). Then you don't need a
+local copy, and you shouldn't keep one, or Claude Code loads the skill twice.
+
+To follow claude.ai's rules, the upload must be a zip with the `video-review-skill` folder at its
+root, holding all six files, not just `SKILL.md`. Its `SKILL.md` can only use the
+[Agent Skills spec](https://agentskills.io/specification) fields (`name`, `description`,
+`license`, `compatibility`, `metadata`, `allowed-tools`), and an upload with any other field
+fails. So leave out the `argument-hint` line, which only adds a hint to Claude Code's `/` menu.
+From PowerShell, in this repo:
+
+```powershell
+$tmp = Join-Path $env:TEMP 'video-review-skill-upload'
+Remove-Item -Recurse -Force $tmp -ErrorAction SilentlyContinue
+New-Item -ItemType Directory $tmp | Out-Null
+Copy-Item -Recurse .\skills\video-review-skill $tmp
+$skill = Join-Path $tmp 'video-review-skill\SKILL.md'
+[IO.File]::WriteAllLines($skill, [string[]](Get-Content $skill | Where-Object { $_ -notmatch '^argument-hint:' }))
+Compress-Archive -Force (Join-Path $tmp 'video-review-skill') "$env:TEMP\video-review-skill.zip"
+```
+
+Then upload `video-review-skill.zip` from your temp folder (type `%TEMP%` in File Explorer's
+address bar to find it). After you update this repo, build and upload it again.
 
 ### Without skills
 
