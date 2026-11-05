@@ -138,13 +138,15 @@ short videos such as Shorts, or for just the changed frames (`-ChangesPdf`).
   folder added to PATH). Open a new PowerShell window afterwards so PATH is reloaded, then check
   with `ffmpeg -version`.
 - **Microsoft Edge or Google Chrome** for the PDF (Edge comes with Windows). Use `-NoPdf` to skip it.
-- **Remotion projects only**: Node.js, and `npm install` already run in the project.
+- **Remotion projects only**: Node.js, and `npm install` already run in the project. The tool
+  runs `npx remotion` in that project, which runs the project's own code (its Remotion config and
+  components), so only review Remotion projects you trust.
 - **On-screen text checks**: nothing to install. They use the OCR and spell checker built into
   Windows 10 and 11, through Windows PowerShell 5.1 (also built in). OCR needs a recognizer for your
   language; English is normally there already. If it isn't, the script stops and says how to add
   it (Settings > Time & language > Language & region). Use `-NoOcr` to skip these checks.
 
-The tool lives in `skills/video-review/`, so that folder can be installed on its own as a Claude
+The tool lives in `skills/video-review-skill/`, so that folder can be installed on its own as a Claude
 Code skill (see [Using it with your AI](#using-it-with-your-ai)). Keep its files together:
 
 | File | Does |
@@ -221,17 +223,19 @@ run into `previous\` (replacing the one before) and compares with it.
 
 ### Install it as a Claude Code skill
 
-The `skills/video-review` folder is a complete Claude Code skill: the instructions Claude follows
-(`SKILL.md`) and the tool itself. Copy its files into a `video-review-skill` folder (the skill's
-name) in your personal skills folder and every Claude Code session on your computer can use it.
+The `skills/video-review-skill` folder is a complete Claude Code skill: the instructions Claude
+follows (`SKILL.md`) and the tool itself. The folder has the same name as the skill, as the
+[Agent Skills spec](https://agentskills.io/specification) requires. Copy it into your personal
+skills folder (`~/.claude/skills/`) and every Claude Code session on your computer can use it.
 From PowerShell, in this repo:
 
 ```powershell
 New-Item -ItemType Directory -Force "$HOME\.claude\skills\video-review-skill" | Out-Null
-Copy-Item -Recurse -Force .\skills\video-review\* "$HOME\.claude\skills\video-review-skill\"
+Copy-Item -Recurse -Force .\skills\video-review-skill\* "$HOME\.claude\skills\video-review-skill\"
 ```
 
-That gives you `<your home folder>\.claude\skills\video-review-skill\SKILL.md`. Claude Code picks
+That gives you `~/.claude/skills/video-review-skill/SKILL.md` (on Windows,
+`<your home folder>\.claude\skills\video-review-skill\SKILL.md`). Claude Code picks
 the skill up without a restart (if the `skills` folder didn't exist when the session started, type
 `/reload-skills`). Run the same two lines again after you update this repo.
 
@@ -256,6 +260,20 @@ reports problems with frame numbers and timestamps.
 
 To use the skill in one project only, copy the files into a `video-review-skill` folder inside
 that project's `.claude\skills\` folder instead.
+
+### claude.ai
+
+The skill can't do its work in claude.ai. It runs PowerShell, ffmpeg and Windows' own OCR and
+spell checker on your computer, and skills uploaded to claude.ai run in Anthropic's Linux sandbox,
+which has none of these and can't see your video files. Use it in Claude Code on Windows. If you
+want Claude in claude.ai to look at a video, run the tool yourself and attach the PDF it makes
+(see [Getting a PDF to attach to a chat](#getting-a-pdf-to-attach-to-a-chat)).
+
+So don't upload it to claude.ai. Anthropic's docs say claude.ai rejects skills that use Claude
+Code-only fields such as this skill's `argument-hint`. And a skill you do turn on in claude.ai
+also loads in Claude Code 2.1.273 or later when you're signed in with the same account (as
+`anthropic-skills:video-review-skill`), so with a local copy installed too, Claude Code would
+load it twice.
 
 ### Without skills
 
@@ -331,7 +349,7 @@ the PDF to a chat and ask, for example:
 | `-KeyFramesMaxMB <MB>` | `10` | Size limit for `key-frames.pdf`. Frames are made smaller until it fits. |
 | `-KeepWork` | off | Keep the temporary work folder, for debugging. |
 
-`Get-Help .\skills\video-review\review-video.ps1 -Full` shows the same descriptions.
+`Get-Help .\skills\video-review-skill\review-video.ps1 -Full` shows the same descriptions.
 
 ## Narration
 
@@ -461,4 +479,5 @@ commit if anything matches (exit 1) or if the check itself can't run properly (e
 
 Built with [Claude Code](https://claude.com/claude-code).
 
-Released under the MIT licence; see [LICENSE](LICENSE).
+Released under the MIT licence; see [LICENSE](LICENSE). This is an unofficial community project
+from Ablation Lab. It isn't made, endorsed or supported by Anthropic.
